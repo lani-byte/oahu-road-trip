@@ -1,0 +1,847 @@
+/* Oʻahu Road Trip: a Hawaii permit study game.
+   Plain JavaScript, no build step, no server. Progress lives only in this
+   browser's localStorage, per player profile. No names leave the device. */
+(function () {
+  "use strict";
+
+  // ------------------------------------------------------------------
+  // Data
+  // ------------------------------------------------------------------
+  const Q = window.ORT_QUESTIONS || [];
+  const QBY = Object.fromEntries(Q.map((q) => [q.id, q]));
+
+  // Map positions come from real longitude/latitude, scaled onto a 1000x700 map.
+  const STOPS = [
+    { id: "kapolei",   name: "Kapolei",     topic: "basics",    title: "Permit Basics",      blurb: "Ages, permits and who rides shotgun.", x: 350, y: 550, side: "l" },
+    { id: "pearl",     name: "Pearl City",  topic: "lines",     title: "Lanes & Lines",      blurb: "Yellow, white, solid, dashed.", x: 487, y: 462, side: "r" },
+    { id: "downtown",  name: "Downtown",    topic: "signals",   title: "Signal Central",     blurb: "Lights, arrows and flashing X's.", x: 627, y: 578, side: "l" },
+    { id: "waikiki",   name: "Waikīkī",     topic: "row",       title: "Right of Way",       blurb: "Who goes first, every time.", x: 672, y: 620, side: "r" },
+    { id: "hawaiikai", name: "Hawaiʻi Kai", topic: "signs",     title: "Shapes & Colors",    blurb: "What each sign shape and color means.", x: 822, y: 610, side: "b" },
+    { id: "makapuu",   name: "Makapuʻu",    topic: "symbols",   title: "Sign Showdown",      blurb: "Boss level: signs with no words.", x: 866, y: 578, side: "r", boss: true },
+    { id: "waimanalo", name: "Waimānalo",   topic: "speed",     title: "Speed & Space",      blurb: "Following distance and signals.", x: 806, y: 537, side: "r" },
+    { id: "kailua",    name: "Kailua",      topic: "passing",   title: "Passing & Parking",  blurb: "Pass smart, park right.", x: 772, y: 468, side: "r" },
+    { id: "kaneohe",   name: "Kāneʻohe",    topic: "freeway",   title: "H-3 & Weather",      blurb: "Freeways, rain and fog.", x: 700, y: 446, side: "l" },
+    { id: "laie",      name: "Lāʻie",       topic: "share",     title: "Share the Road",     blurb: "Bikes, motorcycles and big rigs.", x: 528, y: 150, side: "r" },
+    { id: "haleiwa",   name: "Haleʻiwa",    topic: "emergency", title: "Emergency Moves",    blurb: "Blowouts, skids and crashes.", x: 325, y: 232, side: "l" },
+    { id: "wahiawa",   name: "Wahiawā",     topic: "safety",    title: "Safe Choices",       blurb: "Alcohol, phones and seat belts.", x: 425, y: 329, side: "r" },
+  ];
+  const PERMIT_STOP = { name: "Kapālama Hale", x: 578, y: 532 };
+
+  const LEG_LEN = 10;          // questions per stop
+  const STAR_2 = 8;            // 80%: same as the real test's pass mark
+  const STAR_1 = 6;
+  const PERMIT_LEN = 30;
+  const PERMIT_PASS = 24;      // 80%
+  const OT_SECONDS = 60;
+  const READY_SCORE = 27;      // 90% on Permit Day, twice in a row = a safety margin over 80%
+  const SPRINT_LEN = 15;
+  const FLASH_LEN = 15;
+  const BOXES = [0, 1, 2, 4, 7, 14]; // spaced-review intervals in days
+
+  const COLORS = ["#ff5a5f", "#ffcc00", "#19b5c8", "#3ddc84", "#b07cff", "#ff8a3d", "#f4f6fb"];
+  const LEVELS = [
+    [0, "Passenger"], [100, "Backseat Navigator"], [250, "Learner"], [500, "Cruiser"],
+    [800, "Road Scholar"], [1200, "Island Navigator"], [1700, "Kamaʻāina Driver"],
+  ];
+  const BADGES = [
+    { id: "first",   ico: "1st",  name: "First Stop",      how: "Clear any stop" },
+    { id: "perfect", ico: "10/10", name: "Perfect Drive",  how: "Get 10 out of 10 on a stop" },
+    { id: "signs",   ico: "STOP", name: "Sign Master",     how: "3 stars at the Makapuʻu Sign Showdown" },
+    { id: "signpro", ico: "SIGN", name: "Sign Pro",        how: "Master 80% of the no-words signs" },
+    { id: "streak3", ico: "3",    name: "3-Day Streak",    how: "Study 3 days in a row" },
+    { id: "streak7", ico: "7",    name: "Week Warrior",    how: "Study 7 days in a row" },
+    { id: "ot20",    ico: "OT",   name: "Overtime Hero",   how: "Score 20+ in Overtime" },
+    { id: "pit",     ico: "PIT",  name: "Pit Crew",        how: "Finish 5 Pit Stops" },
+    { id: "island",  ico: "360",  name: "Round the Island", how: "2+ stars at every stop" },
+    { id: "permit",  ico: "PASS", name: "Test Passer",     how: "Pass a Permit Day practice test" },
+    { id: "ready",   ico: "100",  name: "Permit Ready",    how: "Meet all three readiness checks" },
+  ];
+
+  // ------------------------------------------------------------------
+  // Storage (device only)
+  // ------------------------------------------------------------------
+  const KEY = "oahu-road-trip-v1";
+  let store = { v: 1, active: null, profiles: {} };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) store = Object.assign(store, JSON.parse(raw));
+  } catch (e) { /* private mode or blocked storage: play without saving */ }
+  let canSave = true;
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(store)); }
+    catch (e) { if (canSave) { canSave = false; toast("Heads up: this browser isn't saving progress."); } }
+  }
+  const P = () => store.profiles[store.active];
+
+  function today() {
+    const d = new Date();
+    return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 864e5);
+  }
+
+  function newProfile(name, color) {
+    const id = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    store.profiles[id] = {
+      id, name, color, xp: 0, streak: 0, lastDay: null, best: {}, cards: {}, badges: [],
+      otBest: 0, permitBest: null, permitTries: 0, pits: 0, answered: 0, right: 0, sound: true, created: Date.now(),
+    };
+    store.active = id;
+    save();
+  }
+
+  // ------------------------------------------------------------------
+  // Helpers
+  // ------------------------------------------------------------------
+  const app = document.getElementById("app");
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduceMotion) document.documentElement.classList.add("anim");
+
+  function level(xp) {
+    let i = 0;
+    while (i + 1 < LEVELS.length && xp >= LEVELS[i + 1][0]) i++;
+    const cur = LEVELS[i][0], next = LEVELS[i + 1] ? LEVELS[i + 1][0] : null;
+    return { n: i + 1, title: LEVELS[i][1], pct: next ? Math.round(((xp - cur) / (next - cur)) * 100) : 100, next };
+  }
+  function stars(n) { return n >= LEG_LEN ? 3 : n >= STAR_2 ? 2 : n >= STAR_1 ? 1 : 0; }
+  function starStr(s) { return "★".repeat(s) + "☆".repeat(3 - s); }
+  function unlocked(i) { return i === 0 || (P().best[STOPS[i - 1].id] || 0) >= 2; }
+  function nextStopIndex() { for (let i = 0; i < STOPS.length; i++) if ((P().best[STOPS[i].id] || 0) < 2) return i; return -1; }
+  function dueCards() {
+    const t = today(), p = P();
+    return Object.entries(p.cards).filter(([id, c]) => QBY[id] && c.due <= t).sort((a, b) => a[1].box - b[1].box).map(([id]) => id);
+  }
+
+  function carSVG(color, cls) {
+    return `<svg class="${cls || ""}" viewBox="0 0 64 40" aria-hidden="true"><path d="M6 26 L12 14 Q14 10 19 10 H42 Q47 10 50 14 L56 22 Q60 23 60 28 V31 H4 V28 Q4 26 6 26 Z" fill="${color}" stroke="#0d1119" stroke-width="2.5"/><path d="M17 14 H30 V22 H12 Z M33 14 H44 L50 22 H33 Z" fill="#bfe9f2" stroke="#0d1119" stroke-width="2"/><circle cx="16" cy="31" r="6" fill="#0d1119"/><circle cx="16" cy="31" r="2.5" fill="#a8b1c7"/><circle cx="48" cy="31" r="6" fill="#0d1119"/><circle cx="48" cy="31" r="2.5" fill="#a8b1c7"/><rect x="55" y="24" width="4" height="3" rx="1" fill="#fff6c2"/></svg>`;
+  }
+
+  const SIGNS = window.ORT_SIGNS || {};
+  function signImg(kind, cls) {
+    const s = SIGNS[kind];
+    return s ? `<svg class="${cls || ""}" viewBox="0 0 120 120" aria-hidden="true">${s.svg}</svg>` : "";
+  }
+  function signSVG(kind) {
+    return SIGNS[kind] ? `<div class="sign-art" role="img" aria-label="Road sign">${signImg(kind)}</div>` : "";
+  }
+  // What to show for an answer: text, or a sign's meaning when choices are signs.
+  const label = (q, v) => (q.cs && SIGNS[v] ? SIGNS[v].name : v);
+
+  // Mastery: a question is "mastered" after 3 correct answers in a row.
+  const MASTER_BOX = 3;
+  function topicIds(t) { return Q.filter((q) => q.t === t).map((q) => q.id); }
+  function mastery(ids) {
+    const c = P().cards;
+    return ids.length ? ids.filter((id) => c[id] && c[id].box >= MASTER_BOX).length / ids.length : 0;
+  }
+  function readiness() {
+    const p = P(), hist = p.permitHist || [];
+    const cleared = STOPS.every((s) => (p.best[s.id] || 0) >= 2);
+    const m = mastery(Q.map((q) => q.id));
+    const lastTwo = hist.length >= 2 && hist.slice(-2).every((x) => x >= READY_SCORE);
+    return { cleared, m, lastTwo, ready: cleared && m >= 0.8 && lastTwo };
+  }
+
+  // Sound: tiny optional beeps
+  let actx = null;
+  function beep(good) {
+    const p = P(); if (!p || !p.sound) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = good ? "triangle" : "sawtooth";
+      o.frequency.setValueAtTime(good ? 660 : 180, actx.currentTime);
+      if (good) o.frequency.exponentialRampToValueAtTime(990, actx.currentTime + 0.12);
+      g.gain.setValueAtTime(0.08, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.22);
+      o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.23);
+    } catch (e) { /* no audio */ }
+  }
+
+  function toast(msg) {
+    const t = document.createElement("div");
+    t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2600);
+  }
+  function floatXP(n) {
+    if (reduceMotion) return;
+    const f = document.createElement("div");
+    f.className = "float-xp"; f.textContent = "+" + n + " XP";
+    document.body.appendChild(f); setTimeout(() => f.remove(), 900);
+  }
+
+  // Spaced review: Leitner boxes
+  function grade(qid, ok) {
+    const p = P(), t = today();
+    const c = p.cards[qid] || { box: 0, due: t, r: 0, w: 0 };
+    if (ok) { c.box = Math.min(c.box + 1, BOXES.length - 1); c.r++; }
+    else { c.box = 0; c.w++; }
+    c.due = t + BOXES[c.box];
+    p.cards[qid] = c;
+    p.answered++; if (ok) p.right++;
+  }
+  function pickFrom(ids, n) {
+    // Weakest and never-seen first, randomized inside each group.
+    const p = P();
+    const score = (id) => (p.cards[id] ? p.cards[id].box + 1 : 0.5) + Math.random() * 1.5;
+    return ids.slice().sort((a, b) => score(a) - score(b)).slice(0, n);
+  }
+
+  function award(id) {
+    const p = P();
+    if (!p.badges.includes(id)) { p.badges.push(id); const b = BADGES.find((x) => x.id === id); setTimeout(() => toast("Badge unlocked: " + b.name), 400); }
+  }
+  function touchStreak() {
+    const p = P(), t = today();
+    if (p.lastDay === t) return;
+    p.streak = p.lastDay === t - 1 ? p.streak + 1 : 1;
+    p.lastDay = t;
+    if (p.streak >= 3) award("streak3");
+    if (p.streak >= 7) award("streak7");
+  }
+
+  // ------------------------------------------------------------------
+  // Screens
+  // ------------------------------------------------------------------
+  let session = null;
+  let tick = null;
+  function clearTick() { if (tick) { clearInterval(tick); tick = null; } }
+  function go(fn) { clearTick(); document.onkeydown = null; fn(); window.scrollTo(0, 0); }
+
+  // Garage: pick or create a player
+  function garage() {
+    const ps = Object.values(store.profiles).sort((a, b) => b.created - a.created);
+    app.innerHTML = `
+      <div class="hero">
+        <p class="muted small">Hawaii learner's permit study game</p>
+        <h1>Oʻahu <span>Road Trip</span></h1>
+        <div class="road-stripe"></div>
+        <p>Drive around the island. Clear each stop with 80% or better to unlock the next one, the same score you need on the real permit test. Then take on <b>Permit Day</b>.</p>
+      </div>
+      <h2>Who's driving?</h2>
+      <div class="profiles">
+        ${ps.map((p) => `<button class="profile" data-id="${p.id}">${carSVG(p.color, "car-badge")}<span><span class="name">${esc(p.name)}</span><br><span class="meta">Lv ${level(p.xp).n} · ${p.xp} XP</span></span></button>`).join("")}
+        <button class="profile new-profile" id="new">+ New driver</button>
+        <button class="profile new-profile" id="restore">Restore from save code</button>
+      </div>
+      <div class="footer">
+        <p>Progress saves only on this device. No accounts, no tracking. Use a nickname, not your real name.</p>
+        <p>Questions are based on the official Hawaii Driver's Manual (Hawaii DOT). This is a study aid, not the official test. Always check the current manual and your county driver licensing office.</p>
+      </div>`;
+    app.querySelectorAll(".profile[data-id]").forEach((b) => b.onclick = () => { store.active = b.dataset.id; save(); go(map); });
+    app.querySelector("#new").onclick = () => go(createProfile);
+    app.querySelector("#restore").onclick = () => go(restoreScreen);
+  }
+
+  function createProfile() {
+    let color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    app.innerHTML = `
+      <div class="card stack">
+        <h2>New driver</h2>
+        <label for="nm" class="small muted">Nickname (shown only on this device)</label>
+        <input id="nm" class="field" maxlength="16" autocomplete="off" placeholder="e.g. TurboTurtle">
+        <div class="small muted">Pick your ride</div>
+        <div class="row"><div id="preview" style="width:120px">${carSVG(color)}</div>
+          <div class="swatches">${COLORS.map((c) => `<button class="swatch" style="background:${c}" data-c="${c}" aria-label="Car color" aria-pressed="${c === color}"></button>`).join("")}</div></div>
+        <div class="row"><button class="btn primary big" id="ok">Start the engine</button><button class="btn ghost" id="back">Back</button></div>
+      </div>`;
+    const nm = app.querySelector("#nm"); nm.focus();
+    app.querySelectorAll(".swatch").forEach((s) => s.onclick = () => {
+      color = s.dataset.c; app.querySelector("#preview").innerHTML = carSVG(color);
+      app.querySelectorAll(".swatch").forEach((x) => x.setAttribute("aria-pressed", x === s));
+    });
+    const ok = () => { const n = nm.value.trim(); if (!n) { nm.focus(); toast("Give your driver a nickname"); return; } newProfile(n, color); go(map); };
+    app.querySelector("#ok").onclick = ok;
+    nm.onkeydown = (e) => { if (e.key === "Enter") ok(); };
+    app.querySelector("#back").onclick = () => go(Object.keys(store.profiles).length ? garage : createProfile);
+  }
+
+  function hud() {
+    const p = P(), lv = level(p.xp);
+    return `
+      <div class="hud">
+        <button class="chip" id="garage" title="Switch driver">${carSVG(p.color, "car-badge")} ${esc(p.name)}</button>
+        <span class="chip">Lv <b>${lv.n}</b> ${esc(lv.title)}</span>
+        <span class="chip">XP <b>${p.xp}</b></span>
+        <span class="chip streak">Streak <b>${p.streak}</b> day${p.streak === 1 ? "" : "s"}</span>
+        <span class="spacer"></span>
+        <button class="chip" id="snd" aria-pressed="${p.sound}">Sound ${p.sound ? "on" : "off"}</button>
+      </div>
+      <div class="xpbar" title="Progress to next level"><i style="width:${lv.pct}%"></i></div>`;
+  }
+  function wireHud() {
+    app.querySelector("#garage").onclick = () => go(garage);
+    app.querySelector("#snd").onclick = () => { P().sound = !P().sound; save(); go(map); };
+  }
+
+  function mapSVG() {
+    const p = P(), nx = nextStopIndex();
+    const pts = STOPS.map((s) => `${s.x},${s.y}`).concat(`${PERMIT_STOP.x},${PERMIT_STOP.y}`);
+    let doneUpTo = 0;
+    for (let i = 0; i < STOPS.length; i++) if ((p.best[STOPS[i].id] || 0) >= 2) doneUpTo = i + 1; else break;
+    const donePts = pts.slice(0, Math.max(1, doneUpTo + (doneUpTo < STOPS.length ? 1 : 1)));
+    const carAt = nx === -1 ? PERMIT_STOP : STOPS[nx];
+    // Coastline traced from real lon/lat points (x = 75 + (lon+158.30)*1250, y = 20 + (21.73-lat)*1343).
+    const island = "100,228 160,222 225,221 275,214 319,201 369,141 400,94 440,62 462,47 505,82 550,127 569,181 605,220 637,255 656,302 672,345 687,396 720,415 750,423 776,392 800,383 812,398 806,409 790,420 794,463 812,500 837,550 870,566 887,584 868,620 837,644 812,631 760,640 715,650 687,658 662,638 640,610 612,591 580,584 550,577 494,577 500,540 500,503 475,490 450,512 450,530 469,571 450,584 380,592 312,597 294,557 250,483 206,403 175,362 150,310 137,262";
+    return `
+    <svg class="map" viewBox="0 0 1000 700" role="img" aria-label="Map of Oʻahu with ${STOPS.length} stops">
+      <path class="wave" d="M40 80 q20 -12 40 0 t40 0"/><path class="wave" d="M860 160 q20 -12 40 0 t40 0"/><path class="wave" d="M120 640 q20 -12 40 0 t40 0"/><path class="wave" d="M900 300 q20 -12 40 0 t40 0"/>
+      <polygon class="island" points="${island}"/>
+      <polyline class="ridge" points="150,285 205,330 255,405 300,490"/>
+      <polyline class="ridge" points="470,100 535,175 590,255 640,345 672,420 715,505 790,585"/>
+      <polyline class="route" points="${pts.join(" ")}"/>
+      <polyline class="route-dash" points="${pts.join(" ")}"/>
+      ${doneUpTo > 0 ? `<polyline class="route-done" points="${donePts.join(" ")}"/>` : ""}
+      <text class="label" x="110" y="110" style="font-family:var(--display);font-size:34px;fill:var(--line)">OʻAHU</text>
+      <text class="label" x="110" y="138" style="font-size:14px;fill:#bfe9f2">Road Trip</text>
+      ${STOPS.map((s, i) => {
+        const st = p.best[s.id] || 0, lock = !unlocked(i);
+        const fill = st >= 2 ? "var(--go)" : s.boss ? "var(--coral)" : "var(--line)";
+        const left = s.side === "l", below = s.side === "b";
+        const lx = below ? s.x : left ? s.x - 18 : s.x + 18, anchor = below ? "middle" : left ? "end" : "start";
+        const ly = below ? s.y + 34 : s.y - 6, sy = below ? s.y + 50 : s.y + 13;
+        return `<g class="stop ${lock ? "locked" : ""} ${i === nx ? "next" : ""}" data-i="${i}" tabindex="${lock ? -1 : 0}" role="button" aria-label="Stop ${i + 1}: ${esc(s.name)}, ${esc(s.title)}${lock ? ", locked" : ""}">
+          <circle class="ring" cx="${s.x}" cy="${s.y}" r="18"/>
+          <circle class="stop-dot" cx="${s.x}" cy="${s.y}" r="13" fill="${fill}"/>
+          <text class="label" x="${lx}" y="${ly}" text-anchor="${anchor}">${esc(s.name)}</text>
+          ${st ? `<text class="stars" x="${lx}" y="${sy}" text-anchor="${anchor}">${starStr(st)}</text>` : s.boss ? `<text class="boss-tag" x="${lx}" y="${sy}" text-anchor="${anchor}">BOSS</text>` : ""}
+        </g>`;
+      }).join("")}
+      <g class="stop" data-permit="1" tabindex="0" role="button" aria-label="Permit Day final test at ${PERMIT_STOP.name}">
+        <rect x="${PERMIT_STOP.x - 14}" y="${PERMIT_STOP.y - 14}" width="28" height="28" rx="6" fill="#fff" stroke="#0d1119" stroke-width="4"/>
+        <text class="label" x="${PERMIT_STOP.x - 10}" y="${PERMIT_STOP.y - 22}" text-anchor="end">Permit Day</text>
+      </g>
+      <g transform="translate(${carAt.x - 30},${carAt.y - 50})">${carSVG(p.color).replace("<svg ", '<svg width="60" height="38" ')}</g>
+    </svg>`;
+  }
+
+  function map() {
+    const p = P(); if (!p) return go(garage);
+    const due = dueCards().length, nx = nextStopIndex();
+    const cleared = STOPS.filter((s) => (p.best[s.id] || 0) >= 2).length;
+    app.innerHTML = `
+      ${hud()}
+      <div class="map-wrap">${mapSVG()}</div>
+      <p class="small muted center" style="margin-top:8px">${cleared}/${STOPS.length} stops cleared${nx >= 0 ? ` · Next up: <b>${esc(STOPS[nx].name)}</b>` : " · Island complete! Permit Day is calling."}</p>
+      ${readyCard()}
+      <div class="modes">
+        ${nx >= 0 ? `<button class="mode" id="m-next"><h3>Drive to ${esc(STOPS[nx].name)}</h3><p>${esc(STOPS[nx].title)}: ${esc(STOPS[nx].blurb)}</p><span class="pill">${LEG_LEN} questions · need ${STAR_2} to clear</span></button>` : ""}
+        <button class="mode pit" id="m-pit"><h3>Pit Stop</h3><p>Start here each day: review what you missed or are due to see again.</p><span class="pill">${due ? due + " due now" : "Nothing due"}</span></button>
+        <button class="mode" id="m-flash"><h3>Flashcards</h3><p>Think of the answer first, then flip. Pick any topic, even locked ones.</p><span class="pill">Self-check</span></button>
+        <button class="mode boss" id="m-sprint"><h3>Sign Sprint</h3><p>${SPRINT_LEN} signs, most with no words. Know them by shape, color and picture.</p><span class="pill">Mastered: ${Math.round(mastery(topicIds("symbols")) * 100)}%</span></button>
+        <button class="mode ot" id="m-ot"><h3>Overtime</h3><p>${OT_SECONDS}-second lightning round from every stop you've unlocked.</p><span class="pill">Best: ${p.otBest}</span></button>
+        <button class="mode boss" id="m-permit"><h3>Permit Day</h3><p>Practice test: ${PERMIT_LEN} questions from all over the island. No hints until the end.</p><span class="pill">${p.permitBest === null ? "Not tried yet" : "Best: " + p.permitBest + "/" + PERMIT_LEN}</span></button>
+        <button class="mode pit" id="m-coach"><h3>Coach Corner</h3><p>Study plan, car-ride sign spotting and "why" questions for parents.</p><span class="pill">For drivers and parents</span></button>
+      </div>
+      <h3 style="margin-top:22px">All stops</h3>
+      <div class="stop-list">
+        ${STOPS.map((s, i) => {
+          const st = p.best[s.id] || 0, lock = !unlocked(i), m = Math.round(mastery(topicIds(s.topic)) * 100);
+          return `<button class="stop-row ${st >= 2 ? "done" : ""} ${i === nx ? "next" : ""}" data-i="${i}" ${lock ? "disabled" : ""}>
+            <span class="num">${i + 1}</span><span><span class="title">${esc(s.name)}</span><br><span class="sub">${esc(s.title)}${lock ? " · locked" : ` · ${m}% mastered`}</span></span>
+            <span class="st">${st ? starStr(st) : s.boss ? "BOSS" : ""}</span></button>`;
+        }).join("")}
+      </div>
+      <div class="row" style="margin-top:22px"><button class="btn ghost" id="m-badges">Badges (${p.badges.length}/${BADGES.length})</button><button class="btn ghost" id="m-save">Save code backup</button><span class="spacer"></span><button class="linkish" id="m-del">Delete this driver</button></div>
+      <div class="footer"><p>Based on the official Hawaii Driver's Manual (Hawaii DOT). Study aid only. Page numbers in each explanation point to the manual so you can read more.</p></div>`;
+    wireHud();
+    const openStop = (i) => { if (unlocked(i)) go(() => startLeg(i)); else toast("Clear the stop before it with 2 stars first"); };
+    app.querySelectorAll(".map .stop[data-i]").forEach((g) => {
+      g.onclick = () => openStop(+g.dataset.i);
+      g.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openStop(+g.dataset.i); } };
+    });
+    const pd = app.querySelector('.map [data-permit]');
+    pd.onclick = () => go(startPermit); pd.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(startPermit); } };
+    app.querySelectorAll(".stop-row").forEach((b) => b.onclick = () => openStop(+b.dataset.i));
+    const mn = app.querySelector("#m-next"); if (mn) mn.onclick = () => openStop(nx);
+    app.querySelector("#m-pit").onclick = () => go(startPit);
+    app.querySelector("#m-ot").onclick = () => go(startOT);
+    app.querySelector("#m-permit").onclick = () => go(startPermit);
+    app.querySelector("#m-badges").onclick = () => go(badges);
+    app.querySelector("#m-flash").onclick = () => go(flashPick);
+    app.querySelector("#m-sprint").onclick = () => go(startSprint);
+    app.querySelector("#m-coach").onclick = () => go(coach);
+    app.querySelector("#m-save").onclick = () => go(backupScreen);
+    app.querySelector("#m-del").onclick = () => {
+      if (confirm(`Delete ${p.name} and all their progress on this device? This can't be undone.`)) {
+        delete store.profiles[p.id]; store.active = null; save(); go(garage);
+      }
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Save code: back up a driver as text (or a file), restore anywhere.
+  // Nothing is uploaded. The code IS the data, so whoever has it can restore it.
+  // ------------------------------------------------------------------
+  const CODE_PREFIX = "ORT1.";
+  const b64e = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const b64d = (s) => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return decodeURIComponent(escape(atob(s))); };
+
+  function makeCode(p) {
+    const cards = Object.entries(p.cards).filter(([id]) => QBY[id]).map(([id, c]) => [id, c.box, c.due, c.r, c.w]);
+    const data = { v: 1, n: p.name, c: p.color, x: p.xp, s: p.streak, l: p.lastDay, b: p.best, k: cards, g: p.badges,
+      o: p.otBest, pb: p.permitBest, pt: p.permitTries, ph: p.permitHist || [], pi: p.pits, a: p.answered, r: p.right, sp: p.spotted || [] };
+    return CODE_PREFIX + b64e(JSON.stringify(data));
+  }
+
+  // Strictly rebuild a profile from untrusted text: only known fields, right types, sane ranges.
+  function readCode(text) {
+    const raw = String(text || "").replace(/\s+/g, "");
+    if (!raw.startsWith(CODE_PREFIX)) throw new Error("That doesn't look like an Oʻahu Road Trip save code.");
+    let d;
+    try { d = JSON.parse(b64d(raw.slice(CODE_PREFIX.length))); } catch (e) { throw new Error("That save code is incomplete or damaged. Copy the whole thing and try again."); }
+    if (!d || d.v !== 1) throw new Error("This save code is from a different version.");
+    const int = (v, lo, hi, def) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : def);
+    const stopIds = new Set(STOPS.map((s) => s.id)), badgeIds = new Set(BADGES.map((b) => b.id));
+    const best = {};
+    if (d.b && typeof d.b === "object") for (const [k, v] of Object.entries(d.b)) if (stopIds.has(k)) best[k] = int(v, 0, 3, 0);
+    const cards = {};
+    if (Array.isArray(d.k)) for (const row of d.k) {
+      if (!Array.isArray(row) || !QBY[row[0]]) continue;
+      cards[row[0]] = { box: int(row[1], 0, BOXES.length - 1, 0), due: int(row[2], 0, 1e6, today()), r: int(row[3], 0, 1e6, 0), w: int(row[4], 0, 1e6, 0) };
+    }
+    const name = String(d.n || "Driver").slice(0, 16).trim() || "Driver";
+    return {
+      name, color: COLORS.includes(d.c) ? d.c : COLORS[0], xp: int(d.x, 0, 1e7, 0), streak: int(d.s, 0, 1e4, 0),
+      lastDay: Number.isFinite(d.l) ? int(d.l, 0, 1e6, null) : null, best, cards,
+      badges: Array.isArray(d.g) ? d.g.filter((x) => badgeIds.has(x)) : [],
+      otBest: int(d.o, 0, 1e4, 0), permitBest: Number.isFinite(d.pb) ? int(d.pb, 0, PERMIT_LEN, null) : null,
+      permitTries: int(d.pt, 0, 1e5, 0), permitHist: Array.isArray(d.ph) ? d.ph.map((x) => int(x, 0, PERMIT_LEN, 0)).slice(-10) : [],
+      pits: int(d.pi, 0, 1e5, 0), answered: int(d.a, 0, 1e7, 0), right: int(d.r, 0, 1e7, 0),
+      spotted: Array.isArray(d.sp) ? d.sp.filter((k) => typeof k === "string" && SIGNS[k]) : [],
+    };
+  }
+
+  function backupScreen() {
+    const p = P(), code = makeCode(p);
+    app.innerHTML = `${hud()}
+      <div class="card stack" style="margin-top:14px">
+        <h2>Save code backup</h2>
+        <p>This code holds all of <b>${esc(p.name)}</b>'s progress. Keep a copy somewhere safe, like a note or a text to yourself. Use it to restore progress if browser data gets cleared, or to keep playing on a different phone or computer.</p>
+        <p class="small muted">Nothing is uploaded anywhere. Anyone with this code can load this progress, so only share it with people you trust.</p>
+        <textarea class="field code" id="code" readonly rows="5" aria-label="Save code">${esc(code)}</textarea>
+        <div class="row">
+          <button class="btn primary big" id="copy">Copy code</button>
+          <button class="btn ghost" id="dl">Download as file</button>
+          ${navigator.share ? `<button class="btn ghost" id="share">Share</button>` : ""}
+        </div>
+        <p class="small muted">Saved ${new Date().toLocaleDateString()}. Make a fresh code after big study sessions, since an older code won't include newer progress.</p>
+        <p class="small muted">iPhone tip: Safari can clear a website's saved data if you don't open it for about a week. Add this game to your Home Screen (Share, then Add to Home Screen) to help keep progress, and keep a save code just in case.</p>
+        <button class="btn ghost" id="back">Back to the map</button>
+      </div>`;
+    wireHud();
+    const ta = app.querySelector("#code");
+    ta.onclick = () => ta.select();
+    app.querySelector("#copy").onclick = async () => {
+      try { await navigator.clipboard.writeText(code); toast("Save code copied"); }
+      catch (e) { ta.select(); try { document.execCommand("copy"); toast("Save code copied"); } catch (e2) { toast("Select the code and copy it"); } }
+    };
+    app.querySelector("#dl").onclick = () => {
+      const blob = new Blob([code], { type: "text/plain" }), a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `oahu-road-trip-${p.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "driver"}-${new Date().toISOString().slice(0, 10)}.txt`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    const sh = app.querySelector("#share");
+    if (sh) sh.onclick = () => navigator.share({ title: "Oʻahu Road Trip save code", text: code }).catch(() => {});
+    app.querySelector("#back").onclick = () => go(map);
+  }
+
+  function restoreScreen() {
+    app.innerHTML = `
+      <div class="card stack" style="margin-top:14px">
+        <h2>Restore from save code</h2>
+        <p>Paste a save code, or open a save code file. This adds the driver to this device.</p>
+        <textarea class="field code" id="code" rows="5" placeholder="ORT1.…" aria-label="Paste save code"></textarea>
+        <label class="small muted">Or choose a file: <input type="file" id="file" accept=".txt,text/plain"></label>
+        <div class="row"><button class="btn primary big" id="ok">Restore</button><button class="btn ghost" id="back">Back</button></div>
+      </div>`;
+    const ta = app.querySelector("#code");
+    app.querySelector("#file").onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      if (f.size > 500000) { toast("That file is too big to be a save code"); return; }
+      f.text().then((t) => { ta.value = t.trim(); });
+    };
+    app.querySelector("#back").onclick = () => go(garage);
+    app.querySelector("#ok").onclick = () => {
+      let data;
+      try { data = readCode(ta.value); } catch (e) { toast(e.message); return; }
+      const same = Object.values(store.profiles).find((x) => x.name.toLowerCase() === data.name.toLowerCase());
+      if (same) {
+        if (!confirm(`${same.name} already exists on this device. Replace their progress with the save code? (Cancel keeps both.)`)) {
+          data.name = (data.name + " 2").slice(0, 16);
+        } else { delete store.profiles[same.id]; }
+      }
+      newProfile(data.name, data.color);
+      Object.assign(P(), data, { sound: true });
+      save(); toast(`Welcome back, ${data.name}!`); go(map);
+    };
+  }
+
+  function badges() {
+    const p = P();
+    app.innerHTML = `${hud()}
+      <div class="card stack" style="margin-top:14px">
+        <h2>Badges</h2>
+        <div class="badges">${BADGES.map((b) => `<div class="badge ${p.badges.includes(b.id) ? "" : "locked"}"><span class="ico">${b.ico}</span><b>${esc(b.name)}</b><br><span class="muted">${esc(b.how)}</span></div>`).join("")}</div>
+        <div class="stat-grid">
+          <div class="stat"><b>${p.answered}</b><span>answered</span></div>
+          <div class="stat"><b>${p.answered ? Math.round((p.right / p.answered) * 100) : 0}%</b><span>accuracy</span></div>
+          <div class="stat"><b>${Object.keys(p.cards).length}/${Q.length}</b><span>questions seen</span></div>
+        </div>
+        <button class="btn primary" id="back">Back to the map</button>
+      </div>`;
+    wireHud();
+    app.querySelector("#back").onclick = () => go(map);
+  }
+
+  // ------------------------------------------------------------------
+  // Sessions: leg (stop), pit (review), ot (timed), permit (mock test)
+  // ------------------------------------------------------------------
+  function begin(mode, ids, extra) {
+    session = Object.assign({ mode, queue: ids, i: 0, results: [], combo: 0, bestCombo: 0, xp: 0, detour: [], inDetour: false }, extra || {});
+    touchStreak(); save();
+    ask();
+  }
+  function startLeg(i) {
+    const s = STOPS[i];
+    const ids = pickFrom(Q.filter((q) => q.t === s.topic).map((q) => q.id), LEG_LEN);
+    begin("leg", ids, { stop: i });
+  }
+  function startPit() {
+    let ids = dueCards().slice(0, 15), label = "Pit Stop";
+    if (!ids.length) {
+      const seen = Object.keys(P().cards);
+      if (!seen.length) { toast("Drive to a stop first. Missed questions show up here for review."); return go(map); }
+      ids = pickFrom(seen, 10); label = "Bonus Pit Stop";
+      toast("No reviews due. Here are your weakest spots instead.");
+    }
+    begin("pit", shuffle(ids), { label });
+  }
+  function unlockedTopics() {
+    const t = STOPS.filter((s, i) => unlocked(i)).map((s) => s.topic);
+    return new Set(t);
+  }
+  function startOT() {
+    const topics = unlockedTopics();
+    const ids = shuffle(Q.filter((q) => topics.has(q.t)).map((q) => q.id));
+    begin("ot", ids, { score: 0, end: Date.now() + OT_SECONDS * 1000, missed: [] });
+  }
+  function startPermit() {
+    let ids = [];
+    STOPS.forEach((s) => { ids = ids.concat(shuffle(Q.filter((q) => q.t === s.topic).map((q) => q.id)).slice(0, 3)); });
+    ids = shuffle(ids).slice(0, PERMIT_LEN);
+    begin("permit", ids);
+  }
+
+  function startSprint() {
+    const pool = Q.filter((q) => q.t === "symbols" || q.sign).map((q) => q.id);
+    begin("sprint", shuffle(pickFrom(pool, SPRINT_LEN)));
+  }
+
+  // Readiness: three checks that together mean "book the test"
+  function readyCard() {
+    const r = readiness(), hist = P().permitHist || [];
+    const row = (ok, text) => `<li class="${ok ? "ok" : ""}"><span class="tick">${ok ? "✓" : ""}</span>${text}</li>`;
+    return `<div class="card ready-card ${r.ready ? "is-ready" : ""}">
+      <div class="row"><h3>Permit readiness</h3><span class="spacer"></span><b class="ready-pct">${r.ready ? "READY" : Math.round(r.m * 100) + "% mastered"}</b></div>
+      <div class="xpbar"><i style="width:${Math.round(r.m * 100)}%"></i></div>
+      <ul class="checks">
+        ${row(r.cleared, `Clear all ${STOPS.length} stops (2+ stars each)`)}
+        ${row(r.m >= 0.8, "Master 80% of all questions (3 right in a row each)")}
+        ${row(r.lastTwo, `Score ${READY_SCORE}/${PERMIT_LEN}+ on your last two Permit Days${hist.length ? ` (last: ${hist.slice(-2).join(", ")})` : ""}`)}
+      </ul>
+      <p class="small muted" style="margin:6px 0 0">${r.ready ? "You've met every check. Keep doing a daily Pit Stop until test day." : "The real test needs 80%. These checks build a safety margin so test-day nerves don't matter."}</p>
+    </div>`;
+  }
+
+  // Flashcards: retrieval practice with self-check. Think first, then flip.
+  function flashPick() {
+    app.innerHTML = `${hud()}
+      <div class="card stack" style="margin-top:14px">
+        <h2>Flashcards</h2>
+        <p class="muted">Pick a topic. Say the answer out loud (or in your head) before you flip the card. Be honest with "Got it" and "Not yet": cards you miss come back sooner.</p>
+        <div class="stop-list">${STOPS.map((s, i) => `<button class="stop-row" data-i="${i}"><span class="num">${i + 1}</span><span><span class="title">${esc(s.title)}</span><br><span class="sub">${esc(s.name)} · ${Math.round(mastery(topicIds(s.topic)) * 100)}% mastered</span></span></button>`).join("")}
+          <button class="stop-row" data-i="all"><span class="num">★</span><span><span class="title">Mixed: weakest cards</span><br><span class="sub">From every topic</span></span></button></div>
+        <button class="btn ghost" id="back">Back to the map</button>
+      </div>`;
+    wireHud();
+    app.querySelector("#back").onclick = () => go(map);
+    app.querySelectorAll(".stop-row").forEach((b) => b.onclick = () => {
+      const ids = b.dataset.i === "all" ? Q.map((q) => q.id) : topicIds(STOPS[+b.dataset.i].topic);
+      go(() => flash(pickFrom(ids, FLASH_LEN), 0, 0));
+    });
+  }
+  function flash(ids, i, got) {
+    if (i >= ids.length) {
+      touchStreak(); save();
+      app.innerHTML = `<div class="card"><div class="result-hero"><h2>Deck done</h2><div class="big-stars">${got}/${ids.length}</div><p class="muted">"Not yet" cards will come back in your next Pit Stop.</p></div>
+        <div class="row"><button class="btn primary" id="again">Another deck</button><button class="btn ghost" id="map">Map</button></div></div>`;
+      app.querySelector("#again").onclick = () => go(flashPick);
+      app.querySelector("#map").onclick = () => go(map);
+      return;
+    }
+    const q = QBY[ids[i]];
+    app.innerHTML = `
+      <div class="drive-top"><button class="btn ghost" id="quit">Map</button><div><div class="small muted">Flashcards</div><b>Card ${i + 1} of ${ids.length}</b></div></div>
+      <div class="card flashcard" style="margin-top:14px">
+        ${q.sign ? signSVG(q.sign) : ""}
+        <div class="question">${esc(q.q)}</div>
+        <div id="back" class="hidden">
+          ${q.cs ? `<div class="sign-art">${signImg(q.c[0])}</div>` : ""}
+          <div class="feedback"><div class="head">${esc(label(q, q.c[0]))}</div><div>${esc(q.why)}</div><div class="src">Hawaii Driver's Manual, ${esc(q.src)}</div></div>
+          <div class="row" style="margin-top:12px"><button class="btn go big" id="yes">Got it</button><button class="btn danger big" id="no">Not yet</button></div>
+        </div>
+        <div class="row" id="front" style="margin-top:8px"><button class="btn primary big" id="flip">Flip card</button><span class="small muted">Answer it in your head first</span></div>
+      </div>`;
+    app.querySelector("#quit").onclick = () => { save(); go(map); };
+    const flip = () => { app.querySelector("#back").classList.remove("hidden"); app.querySelector("#front").classList.add("hidden"); app.querySelector("#yes").focus(); };
+    app.querySelector("#flip").onclick = flip;
+    const rate = (ok) => { grade(q.id, ok); if (ok) { P().xp += 3; } save(); flash(ids, i + 1, got + (ok ? 1 : 0)); };
+    app.querySelector("#yes").onclick = () => rate(true);
+    app.querySelector("#no").onclick = () => rate(false);
+    document.onkeydown = (e) => {
+      if (app.querySelector("#back").classList.contains("hidden")) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); } }
+      else if (e.key === "1" || e.key === "y") rate(true); else if (e.key === "2" || e.key === "n") rate(false);
+    };
+  }
+
+  // Coach Corner: how to study, plus real-world practice for car rides
+  const CAR_TALK = [
+    ["Why is following distance measured in seconds, not feet?", "Seconds automatically grow with speed. At 60 mph, two seconds covers far more road than at 25 mph, which is exactly the extra room you need to stop."],
+    ["Why does the driver turning left usually have to yield?", "A left turn crosses oncoming traffic's path, so the turning driver is the one creating the conflict."],
+    ["Why is the road most slippery right when it starts to rain?", "Oil from cars sits on the road. The first drops float it up before rain washes it away."],
+    ["Why keep your wheels straight while waiting to turn left?", "If someone rear-ends you, straight wheels keep you from being pushed into oncoming traffic."],
+    ["Why are motorcycles easy to misjudge?", "They're small, so they look farther away and slower than they are. Look twice."],
+    ["Why is the alcohol limit 0.02 for drivers under 21?", "It's zero tolerance: under 21, any real amount of alcohol is illegal, and new drivers are most affected by even small amounts."],
+    ["Why never stop at the end of a freeway on-ramp?", "Merging from a stop into 55+ mph traffic is very hard and dangerous. Match speed instead."],
+    ["Why use low beams, not high beams, in fog?", "High beams bounce off the fog and blind you."],
+    ["Why turn your wheels toward the curb when parking on a hill?", "If the brakes slip, the curb stops the car and it rolls away from traffic, not into it."],
+    ["Why can't you pass within 100 feet of an intersection?", "Cars may turn or pull out there, and you'd be in the wrong lane with no escape."],
+    ["What does the shape of a sign tell you before you can read it?", "Octagon = stop, triangle = yield, diamond = warning, pentagon = school, circle = railroad ahead, pennant = no passing."],
+    ["What's the difference between a merge sign and an added-lane sign?", "Merge: the joining lane flows into yours, so adjust speed. Added lane: it becomes its own lane, so no one has to merge."],
+  ];
+  const SPOT = ["octagon", "triangle", "speed", "donotenter", "oneway", "noturn", "nouturn", "noparking", "keepright", "leftonly", "accessible", "curve", "turn", "winding", "crossroad", "sideroad", "tee", "merge", "laneends", "addedlane", "divided", "dividedends", "twoway", "hill", "slippery", "pedestrian", "bicycle", "signal", "stopahead", "school", "rrahead", "workers", "flagger", "hospital", "interstate", "recreation", "guide"];
+  function coach() {
+    const p = P(); p.spotted = p.spotted || [];
+    app.innerHTML = `${hud()}
+      <div class="card stack" style="margin-top:14px">
+        <h2>Coach Corner</h2>
+        <p>For drivers and the adults helping them. This is the plan that works best, based on learning research.</p>
+        <h3>The plan: 15 to 20 minutes a day for 2 to 3 weeks</h3>
+        <ol class="plan">
+          <li><b>Start every day with a Pit Stop.</b> It brings back what you're about to forget. Short daily sessions beat cramming the night before.</li>
+          <li><b>Then drive one stop or do a Flashcard deck.</b> Answering from memory (not rereading) is what makes facts stick.</li>
+          <li><b>Read every explanation, especially on misses.</b> Then say the rule out loud in your own words. Look up the manual page if it still doesn't click.</li>
+          <li><b>Do a Sign Sprint every few days.</b> The test shows signs with no words. Learn the shape and color first, then the picture.</li>
+          <li><b>Mix it up.</b> Once most stops are cleared, use Overtime and Permit Day. Mixed topics feel harder, but that's what the real test does.</li>
+          <li><b>Book the test when all three readiness checks are green.</b> Two practice tests in a row at 90% gives you a margin for nerves.</li>
+        </ol>
+        <h3>On every car ride: be the navigator</h3>
+        <p class="muted">Before you ever drive, you can practice as a passenger. Call out each sign and what it means, and point out lane lines, signals and who has the right of way at each intersection. Check off signs as you spot them in real life.</p>
+        <div class="spot-grid">${SPOT.filter((k) => SIGNS[k]).map((k) => `<button class="spot ${p.spotted.includes(k) ? "on" : ""}" data-k="${k}" aria-pressed="${p.spotted.includes(k)}">${signImg(k)}<span>${esc(SIGNS[k].name)}</span></button>`).join("")}</div>
+        <p class="small muted" id="spotcount">${p.spotted.length} of ${SPOT.length} spotted on Oʻahu roads</p>
+        <h3>Car Talk: "why" questions for parents to ask</h3>
+        <p class="muted">Knowing <i>why</i> a rule exists makes it much easier to remember and to use on the road. Ask one per ride. Tap to see a good answer.</p>
+        ${CAR_TALK.map(([qq, a]) => `<details class="talk"><summary>${esc(qq)}</summary><p>${esc(a)}</p></details>`).join("")}
+        <h3>Before test day</h3>
+        <ul class="plan">
+          <li>Read the official <a href="https://hidot.hawaii.gov/highways/library/motor-vehicle-safety-office/" target="_blank" rel="noopener">Hawaii Driver's Manual</a> once, start to finish. This game covers the key facts, but the manual is the source.</li>
+          <li>Check your county driver licensing office's website for the documents to bring, fees, hours and appointments. Under 18 needs parent or guardian consent.</li>
+          <li>The test also includes a vision screening.</li>
+          <li>Read each question all the way through. Watch for words like <i>never</i>, <i>always</i>, <i>except</i> and <i>at least</i>.</li>
+        </ul>
+        <button class="btn primary" id="back">Back to the map</button>
+      </div>`;
+    wireHud();
+    app.querySelector("#back").onclick = () => go(map);
+    app.querySelectorAll(".spot").forEach((b) => b.onclick = () => {
+      const k = b.dataset.k, on = p.spotted.includes(k);
+      p.spotted = on ? p.spotted.filter((x) => x !== k) : p.spotted.concat(k);
+      b.classList.toggle("on", !on); b.setAttribute("aria-pressed", String(!on));
+      app.querySelector("#spotcount").textContent = `${p.spotted.length} of ${SPOT.length} spotted on Oʻahu roads`;
+      save();
+    });
+  }
+
+  function title() {
+    const s = session;
+    if (s.mode === "leg") return `${STOPS[s.stop].name}: ${STOPS[s.stop].title}${s.inDetour ? " · Detour" : ""}`;
+    if (s.mode === "pit") return s.label;
+    if (s.mode === "sprint") return "Sign Sprint";
+    if (s.mode === "ot") return "Overtime";
+    return "Permit Day practice test";
+  }
+
+  function ask() {
+    const s = session;
+    if (s.mode === "ot" && Date.now() >= s.end) return finish();
+    if (s.i >= s.queue.length) {
+      if (s.mode === "leg" && !s.inDetour && s.detour.length) {
+        s.inDetour = true; s.queue = shuffle(s.detour); s.i = 0;
+        toast("Detour! One more look at the ones you missed.");
+      } else if (s.mode === "ot") { s.queue = s.queue.concat(shuffle(s.queue)); }
+      else return finish();
+    }
+    const q = QBY[s.queue[s.i]];
+    const opts = shuffle(q.c.map((text, k) => ({ text, ok: k === 0 })));
+    const p = P();
+    const total = s.inDetour ? s.queue.length : s.queue.length;
+    const firstPassRight = s.results.filter((r) => r.ok && !r.detour).length;
+    const progress = s.mode === "leg" && !s.inDetour ? firstPassRight / LEG_LEN : s.mode === "permit" ? s.i / PERMIT_LEN : s.mode === "pit" ? s.i / total : 0;
+
+    app.innerHTML = `
+      <div class="drive-top"><button class="btn ghost" id="quit" aria-label="Back to map">Map</button><div><div class="small muted">${esc(title())}</div><b>${s.mode === "ot" ? "Score " + s.score : "Question " + (s.i + 1) + " of " + total}</b></div><span class="spacer"></span>${s.combo >= 2 && s.mode !== "permit" ? `<span class="combo">x${s.combo} combo</span>` : ""}</div>
+      ${s.mode === "ot" ? `<div class="timer" style="margin-top:12px"><i id="tbar" style="width:${Math.max(0, ((s.end - Date.now()) / (OT_SECONDS * 1000)) * 100)}%"></i></div>` :
+        `<div class="track" aria-hidden="true"><div class="finish"></div><div class="car" id="car" style="left:calc(${Math.round(progress * 100)}% * .82)">${carSVG(p.color)}</div></div>`}
+      <div class="card">
+        ${q.sign ? signSVG(q.sign) : ""}
+        <div class="question" id="qtext">${esc(q.q)}</div>
+        <div class="choices ${q.cs ? "sign-choices" : ""}">${opts.map((o, k) => `<button class="choice" data-k="${k}" aria-label="Option ${k + 1}${q.cs ? "" : ": " + esc(o.text)}"><span class="key">${k + 1}</span>${q.cs ? signImg(o.text, "choice-sign") : `<span>${esc(o.text)}</span>`}</button>`).join("")}</div>
+        <div id="fb"></div>
+      </div>`;
+    app.querySelector("#quit").onclick = () => { if (s.mode === "permit" && s.i > 0 && !confirm("Leave Permit Day? This attempt won't count.")) return; save(); go(map); };
+
+    let answered = false;
+    const choose = (k) => {
+      if (answered) return; answered = true;
+      const o = opts[k];
+      const btns = app.querySelectorAll(".choice");
+      btns.forEach((b, j) => { b.disabled = true; if (s.mode !== "permit") { if (opts[j].ok) b.classList.add("right"); else if (j === k) b.classList.add("wrong"); } });
+      if (s.mode === "permit") btns[k].style.borderColor = "var(--ocean)";
+      const correct = opts.find((x) => x.ok).text;
+      s.results.push({ id: q.id, ok: o.ok, picked: o.text, correct, detour: s.inDetour });
+      if (!s.inDetour) grade(q.id, o.ok);
+      if (o.ok) { s.combo++; s.bestCombo = Math.max(s.bestCombo, s.combo); } else s.combo = 0;
+
+      if (s.mode === "permit") { s.i++; save(); setTimeout(ask, 250); return; }
+
+      beep(o.ok);
+      const car = app.querySelector("#car");
+      let gain = 0;
+      if (o.ok) {
+        gain = s.inDetour ? 5 : 10 + (s.combo >= 3 ? 5 : 0);
+        if (car) { const fp = s.results.filter((r) => r.ok && !r.detour).length; car.style.left = `calc(${Math.round((s.mode === "leg" && !s.inDetour ? fp / LEG_LEN : (s.i + 1) / total) * 100)}% * .82)`; car.classList.add("boost"); }
+      } else if (car) car.classList.add("bump");
+      if (gain) { s.xp += gain; P().xp += gain; floatXP(gain); }
+      if (!o.ok && s.mode === "leg" && !s.inDetour) s.detour.push(q.id);
+
+      if (s.mode === "ot") {
+        if (o.ok) s.score++; else { s.missed.push(q.id); s.end -= 3000; }
+        s.i++; save();
+        setTimeout(ask, o.ok ? 350 : 900);
+        return;
+      }
+
+      app.querySelector("#fb").innerHTML = `
+        <div class="feedback ${o.ok ? "" : "bad"}">
+          <div class="head">${o.ok ? pick(["Nice!", "Clean drive!", "Shoots!", "Right on!", "Smooth!"]) : "Pothole!"}</div>
+          ${o.ok ? (q.cs ? `<div>That sign means: <b>${esc(label(q, correct))}</b></div>` : "") : `<div>Answer: <b>${esc(label(q, correct))}</b></div>`}
+          <div>${esc(q.why)}</div>
+          <div class="src">Hawaii Driver's Manual, ${esc(q.src)}</div>
+        </div>
+        <div class="row" style="margin-top:12px"><button class="btn go big" id="next">Keep driving</button><span class="small muted">or press Enter</span></div>`;
+      const nb = app.querySelector("#next"); nb.focus();
+      nb.onclick = () => { s.i++; save(); ask(); };
+      document.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); nb.onclick(); } };
+    };
+    app.querySelectorAll(".choice").forEach((b) => b.onclick = () => choose(+b.dataset.k));
+    document.onkeydown = (e) => { const n = parseInt(e.key, 10); if (n >= 1 && n <= opts.length) choose(n - 1); };
+
+    if (s.mode === "ot") {
+      clearTick();
+      tick = setInterval(() => {
+        const left = s.end - Date.now(), bar = document.getElementById("tbar");
+        if (bar) bar.style.width = Math.max(0, (left / (OT_SECONDS * 1000)) * 100) + "%";
+        if (left <= 0) { clearTick(); finish(); }
+      }, 200);
+    }
+  }
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+  function reviewList(rows) {
+    if (!rows.length) return "";
+    return `<h3 style="margin-top:16px">Review</h3><ul class="review-list">${rows.map((r) => {
+      const q = QBY[r.id];
+      return `<li><div><b>${esc(q.q)}</b></div>${q.sign ? signImg(q.sign, "review-sign") : ""}${q.cs ? signImg(q.c[0], "review-sign") : ""}<div class="ans">${esc(label(q, q.c[0]))}</div>${r.picked && r.picked !== q.c[0] ? `<div class="yours small">You picked: ${esc(label(q, r.picked))}</div>` : ""}<div class="small muted">${esc(q.why)} (Manual ${esc(q.src)})</div></li>`;
+    }).join("")}</ul>`;
+  }
+
+  function finish() {
+    clearTick(); document.onkeydown = null;
+    const s = session, p = P();
+    let body = "";
+    if (s.mode === "leg") {
+      const st = STOPS[s.stop];
+      const right = s.results.filter((r) => r.ok && !r.detour).length;
+      const got = stars(right), prev = p.best[st.id] || 0;
+      if (got > prev) p.best[st.id] = got;
+      const bonus = got >= 2 && prev < 2 ? 50 : 0;
+      if (bonus) { p.xp += bonus; s.xp += bonus; }
+      if (got >= 1) award("first");
+      if (right === LEG_LEN) award("perfect");
+      if (st.id === "makapuu" && got === 3) award("signs");
+      if (STOPS.every((x) => (p.best[x.id] || 0) >= 2)) award("island");
+      const nextI = s.stop + 1;
+      const cleared = got >= 2;
+      body = `
+        <div class="result-hero">
+          <div class="small muted">${esc(st.name)}: ${esc(st.title)}</div>
+          <h2>${cleared ? (got === 3 ? "Perfect drive!" : "Stop cleared!") : "Almost there"}</h2>
+          <div class="big-stars" aria-label="${got} of 3 stars">${"★".repeat(got)}<span class="off">${"★".repeat(3 - got)}</span></div>
+          <p class="muted">${cleared ? (nextI < STOPS.length && prev < 2 ? `Road to <b>${esc(STOPS[nextI].name)}</b> is open.` : "Nice work.") : `You need ${STAR_2} of ${LEG_LEN} to clear this stop. Try again, the questions you missed come back first.`}</p>
+        </div>
+        <div class="stat-grid"><div class="stat"><b>${right}/${LEG_LEN}</b><span>first try</span></div><div class="stat"><b>+${s.xp}</b><span>XP${bonus ? " + bonus" : ""}</span></div><div class="stat"><b>x${s.bestCombo}</b><span>best combo</span></div></div>
+        <div class="row"><button class="btn primary big" id="again">${cleared ? "Replay for 3 stars" : "Try again"}</button>${cleared && nextI < STOPS.length ? `<button class="btn go big" id="next">Drive to ${esc(STOPS[nextI].name)}</button>` : ""}<button class="btn ghost" id="map">Map</button></div>`;
+      save();
+      app.innerHTML = `<div class="card">${body}</div>`;
+      app.querySelector("#again").onclick = () => go(() => startLeg(s.stop));
+      const nb = app.querySelector("#next"); if (nb) nb.onclick = () => go(() => startLeg(nextI));
+    } else if (s.mode === "pit" || s.mode === "sprint") {
+      if (s.mode === "pit") { p.pits++; if (p.pits >= 5) award("pit"); }
+      const right = s.results.filter((r) => r.ok).length;
+      save();
+      app.innerHTML = `<div class="card"><div class="result-hero"><h2>${s.mode === "sprint" ? "Sign Sprint done" : "Pit Stop done"}</h2><p class="muted">${right} of ${s.results.length} correct. Right answers move further out in your review schedule. Misses come back tomorrow.</p></div>
+        <div class="row"><button class="btn primary" id="map">Back to the map</button></div>
+        ${reviewList(s.results.filter((r) => !r.ok))}</div>`;
+    } else if (s.mode === "ot") {
+      const newBest = s.score > p.otBest; if (newBest) p.otBest = s.score;
+      if (s.score >= 20) award("ot20");
+      const bonus = s.score * 2; p.xp += bonus;
+      save();
+      const missed = [...new Set(s.missed)].map((id) => ({ id }));
+      app.innerHTML = `<div class="card"><div class="result-hero"><div class="small muted">Overtime</div><h2>${newBest ? "New best!" : "Time!"}</h2><div class="big-stars">${s.score}</div><p class="muted">Best: ${p.otBest} · +${s.xp + bonus} XP · Each miss costs 3 seconds.</p></div>
+        <div class="row"><button class="btn primary big" id="again">Run it back</button><button class="btn ghost" id="map">Map</button></div>
+        ${reviewList(missed)}</div>`;
+      app.querySelector("#again").onclick = () => go(startOT);
+    } else {
+      const right = s.results.filter((r) => r.ok).length, pass = right >= PERMIT_PASS;
+      p.permitTries++;
+      p.permitHist = (p.permitHist || []).concat(right).slice(-10);
+      if (p.permitBest === null || right > p.permitBest) p.permitBest = right;
+      const gain = right * 3 + (pass ? 100 : 0); p.xp += gain;
+      if (pass) award("permit");
+      save();
+      app.innerHTML = `<div class="card"><div class="result-hero"><div class="small muted">Permit Day practice test</div>
+          <h2>${pass ? "You passed!" : "Not yet"}</h2><div class="big-stars">${right}/${PERMIT_LEN}</div>
+          <p class="muted">${pass ? "That's a passing score on this practice test. Keep it up with Pit Stops until test day." : `You need ${PERMIT_PASS} to pass this practice test. Review the misses below, then hit the stops for those topics.`}</p>
+          <p class="small muted">Practice format: ${PERMIT_LEN} questions, ${PERMIT_PASS} to pass (80%). Check the current test format with your county driver licensing office.</p></div>
+        <div class="stat-grid"><div class="stat"><b>${Math.round((right / PERMIT_LEN) * 100)}%</b><span>score</span></div><div class="stat"><b>+${gain}</b><span>XP</span></div><div class="stat"><b>${p.permitTries}</b><span>attempts</span></div></div>
+        <div class="row"><button class="btn primary big" id="again">Take another</button><button class="btn ghost" id="map">Map</button></div>
+        ${reviewList(s.results.filter((r) => !r.ok))}</div>`;
+      app.querySelector("#again").onclick = () => go(startPermit);
+    }
+    if (mastery(topicIds("symbols")) >= 0.8) award("signpro");
+    if (readiness().ready) award("ready");
+    save();
+    const mb = app.querySelector("#map"); if (mb) mb.onclick = () => go(map);
+    window.scrollTo(0, 0);
+  }
+
+  // ------------------------------------------------------------------
+  // Boot
+  // ------------------------------------------------------------------
+  if (store.active && store.profiles[store.active]) go(map);
+  else go(Object.keys(store.profiles).length ? garage : garage);
+})();
