@@ -15,7 +15,7 @@
     // ---------- Sign -> meaning (no words on most of these) ----------
     S("y1", "octagon", ["Stop", "Yield", "Do not enter", "Railroad crossing"], "Only stop signs are 8-sided (octagon). You'd know it even with no words.", "p. 44"),
     S("y2", "triangle", ["Yield", "Stop", "Warning", "No passing"], "A downward-pointing red and white triangle is always a yield sign.", "p. 44"),
-    S("y3", "donotenter", ["Do not enter", "No parking", "Hospital", "Stop ahead"], "A red circle with a white bar means do not enter. You're facing the wrong way on a one-way road or ramp."),
+    S("y3", "donotenter", ["Do not enter", "No parking", "Hospital", "Stop ahead"], "The red circle with a white bar means do not enter, so you'd be going the wrong way on a one-way road or freeway ramp. Learn the shape too: the red circle and white bar alone mean the same thing."),
     S("y4", "noright", ["No right turn", "Right turn only", "Sharp right curve ahead", "Keep right"], "A red circle and slash over an arrow means that movement is prohibited.", "p. 46"),
     S("y5", "nouturn", ["No U-turn", "U-turn allowed", "Winding road", "Reverse curve"], "The U-shaped arrow under a red circle and slash means no U-turns.", "p. 46"),
     S("y6", "noparking", ["No parking", "Parking area", "Accessible parking", "Pay to park"], "P with a red circle and slash means no parking.", "p. 46"),
@@ -63,7 +63,7 @@
     { id: "z2", t: "symbols", cs: true, q: "Which sign means YIELD?", c: ["triangle", "octagon", "pennantblank", "smv"], why: "A downward red-and-white triangle is yield.", src: "p. 44" },
     { id: "z3", t: "symbols", cs: true, q: "Which sign warns that traffic will MERGE into your lane?", c: ["merge", "addedlane", "laneends", "divided"], why: "Merge shows a lane flowing into yours. Added lane shows a lane joining without merging.", src: M },
     { id: "z4", t: "symbols", cs: true, q: "Which sign warns of a SCHOOL zone or crossing?", c: ["school", "pedestrian", "nopeds", "flagger"], why: "Only school signs use the 5-sided pentagon shape.", src: "p. 48" },
-    { id: "z5", t: "symbols", cs: true, q: "Which sign means DO NOT ENTER?", c: ["donotenter", "noparking", "octagon", "noright"], why: "Red circle, white bar: do not enter.", src: M },
+    { id: "z5", t: "symbols", cs: true, q: "Which sign means NO PEDESTRIANS allowed?", c: ["nopeds", "pedestrian", "school", "nobikes"], why: "A person inside a red circle with a slash means pedestrians are prohibited. The yellow diamond with a walker is a crossing warning.", src: "p. 46-47" },
     { id: "z6", t: "symbols", cs: true, q: "Which sign warns of a SHARP turn (not a gentle curve)?", c: ["turn", "curve", "reverse", "winding"], why: "Right-angle arrow = sharp turn. Smooth bend = curve.", src: M },
     { id: "z7", t: "symbols", cs: true, q: "Which sign means the DIVIDED HIGHWAY ENDS?", c: ["dividedends", "divided", "twoway", "yjunction"], why: "The median shape is at the bottom, ending before the road ahead, so two-way traffic is coming.", src: "p. 47" },
     { id: "z8", t: "symbols", cs: true, q: "Which sign warns of a RAILROAD crossing ahead?", c: ["rrahead", "crossroad", "crossbuck", "hospital"], why: "The round yellow sign comes before the tracks. The crossbuck sits right at the tracks.", src: "p. 38" },

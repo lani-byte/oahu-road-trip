@@ -18,6 +18,24 @@
   const bike = (s) => `<g ${s || ""}><circle cx="40" cy="76" r="12" fill="none" stroke="${K}" stroke-width="5"/><circle cx="80" cy="76" r="12" fill="none" stroke="${K}" stroke-width="5"/>${ln("M40 76 L54 56 L74 56 L80 76 M54 56 L62 76 L74 56 M50 50 H60 M72 50 L76 48", 5)}<circle cx="64" cy="34" r="6" fill="${K}"/>${ln("M62 41 L58 54 M60 46 L72 52", 5)}</g>`;
   const octa = (cx, cy, r) => { const a = r * 0.414; return `<polygon points="${cx - a},${cy - r} ${cx + a},${cy - r} ${cx + r},${cy - a} ${cx + r},${cy + a} ${cx + a},${cy + r} ${cx - a},${cy + r} ${cx - r},${cy + a} ${cx - r},${cy - a}" fill="${R}" stroke="${W}" stroke-width="3"/>`; };
 
+  /*
+    OFFICIAL artwork: exact US sign designs (Federal MUTCD), public domain,
+    from Wikimedia Commons (files named "MUTCD <code>.svg"). Stored in signs/.
+    The game shows these instead of the hand-drawn versions below. Hand-drawn
+    art is only used for shape-only drills, generic guide-sign examples and the
+    slow-moving vehicle emblem (an emblem on vehicles, not a road sign).
+  */
+  window.ORT_OFFICIAL = {
+    stop: "R1-1", yield: "R1-2", donotenter: "R5-1", oneway: "R6-1R", noright: "R3-1", noturn: "R3-2",
+    nouturn: "R3-4", noparking: "R8-3", nobikes: "R5-6", nopeds: "R9-3", keepright: "R4-7", leftonly: "R3-5L",
+    accessible: "R7-8", speed: "R2-1", warning: "W2-1", curve: "W1-2R", turn: "W1-1R", reverse: "W1-4R",
+    winding: "W1-5R", crossroad: "W2-1", sideroad: "W2-2R", tee: "W2-4", yjunction: "W2-5", merge: "W4-1R",
+    laneends: "W4-2R", addedlane: "W4-3R", divided: "W6-1", dividedends: "W6-2", twoway: "W6-3", hill: "W7-1",
+    slippery: "W8-5", pedestrian: "W11-2", bicycle: "W11-1", signal: "W3-3", stopahead: "W3-1", yieldahead: "W3-2",
+    school: "S1-1", rrahead: "W10-1", crossbuck: "R15-1", pennant: "W14-3", flagger: "CW20-7", workers: "CW21-1a",
+    hospital: "D9-2", construction: "CW20-1", interstate: "I-H1",
+  };
+
   window.ORT_SIGNS = {
     // ---------- Regulatory (shape tells you a lot) ----------
     stop: { name: "Stop", svg: `<polygon points="35,5 85,5 115,35 115,85 85,115 35,115 5,85 5,35" fill="${R}" stroke="${W}" stroke-width="5"/><text x="60" y="72" text-anchor="middle" font-family="Arial Black, Arial" font-weight="900" font-size="30" fill="${W}">STOP</text>` },
@@ -77,7 +95,7 @@
     // ---------- Guide and services ----------
     guide: { name: "Guide sign (directions and distance)", svg: `<rect x="4" y="22" width="112" height="76" rx="10" fill="${G}" stroke="${W}" stroke-width="4"/><text x="60" y="55" text-anchor="middle" font-family="Arial" font-weight="700" font-size="17" fill="${W}">Haleʻiwa</text><text x="60" y="82" text-anchor="middle" font-family="Arial" font-weight="700" font-size="17" fill="${W}">12 mi</text>` },
     hospital: { name: "Hospital (services)", svg: sq(`<text x="60" y="88" text-anchor="middle" font-family="Arial Black, Arial" font-weight="900" font-size="72" fill="${W}">H</text>`, B) },
-    interstate: { name: "Interstate route marker (like H-1)", svg: `<path d="M14 18 Q60 4 106 18 Q114 70 60 114 Q6 70 14 18 Z" fill="${B}" stroke="${W}" stroke-width="4"/><path d="M14 18 Q60 4 106 18 L104 36 H16 Z" fill="${R}"/><text x="60" y="80" text-anchor="middle" font-family="Arial Black, Arial" font-weight="900" font-size="32" fill="${W}">H-1</text>` },
+    interstate: { name: "Interstate route marker (H-1)", svg: `<path d="M14 18 Q60 4 106 18 Q114 70 60 114 Q6 70 14 18 Z" fill="${B}" stroke="${W}" stroke-width="4"/><path d="M14 18 Q60 4 106 18 L104 36 H16 Z" fill="${R}"/><text x="60" y="80" text-anchor="middle" font-family="Arial Black, Arial" font-weight="900" font-size="32" fill="${W}">H-1</text>` },
     recreation: { name: "Recreation or cultural interest (brown)", svg: `<rect x="4" y="22" width="112" height="76" rx="10" fill="#6b3f1e" stroke="${W}" stroke-width="4"/><text x="60" y="55" text-anchor="middle" font-family="Arial" font-weight="700" font-size="15" fill="${W}">Beach Park</text><text x="60" y="80" text-anchor="middle" font-family="Arial" font-weight="700" font-size="15" fill="${W}">Next Right</text>` },
   };
 })();

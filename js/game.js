@@ -117,9 +117,11 @@
   }
 
   const SIGNS = window.ORT_SIGNS || {};
+  const OFFICIAL = window.ORT_OFFICIAL || {};
   function signImg(kind, cls) {
     const s = SIGNS[kind];
-    return s ? `<svg class="${cls || ""}" viewBox="0 0 120 120" aria-hidden="true">${s.svg}</svg>` : "";
+    if (OFFICIAL[kind]) return `<img class="sign-img ${cls || ""}" src="signs/${OFFICIAL[kind]}.svg" alt="" draggable="false" loading="lazy">`;
+    return s ? `<svg class="sign-img ${cls || ""}" viewBox="0 0 120 120" aria-hidden="true">${s.svg}</svg>` : "";
   }
   function signSVG(kind) {
     return SIGNS[kind] ? `<div class="sign-art" role="img" aria-label="Road sign">${signImg(kind)}</div>` : "";

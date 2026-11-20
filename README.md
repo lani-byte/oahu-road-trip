@@ -7,7 +7,7 @@ Made in Honolulu as a Christmas 2026 gift to the local tech and AI community.
 ## How it plays
 
 - **12 stops around the island**, each covering one topic: Permit Basics (Kapolei), Lanes & Lines (Pearl City), Signals (Downtown), Right of Way (Waikīkī), Shapes & Colors (Hawaiʻi Kai), the **Sign Showdown** boss level with signs that have no words (Makapuʻu), Speed & Space (Waimānalo), Passing & Parking (Kailua), H-3 & Weather (Kāneʻohe), Share the Road (Lāʻie), Emergency Moves (Haleʻiwa) and Safe Choices (Wahiawā).
-- **279 questions**, including 58 wordless sign questions drawn as 53 SVG signs. Some ask "what does this sign mean?" and others ask you to pick the right sign from four pictures.
+- **279 questions**, including 58 sign questions using 44 official US road signs (most of them symbol-only, like the real test shows). Some ask "what does this sign mean?" and others ask you to pick the right sign from four pictures.
 - **10 questions per stop.** Get 8 right (80%, the same mark as the real test) to earn 2 stars and unlock the next stop. 10/10 earns 3 stars.
 - **Detour:** questions you miss come back at the end of the stop for another try.
 - **Pit Stop:** a spaced-review round. Missed questions return the next day, and questions you keep getting right show up less often (after 1, 2, 4, 7 and 14 days).
@@ -44,7 +44,7 @@ Made in Honolulu as a Christmas 2026 gift to the local tech and AI community.
 
 Every question is **original wording** written to test a fact from the official *Hawaii Driver's Manual* published by the Hawaii Department of Transportation (English edition, HPC 10/18 printing, the version posted at [hidot.hawaii.gov](https://hidot.hawaii.gov/highways/library/motor-vehicle-safety-office/) as of November 2026). The manual's own test questions are not reproduced. Each explanation lists the manual page so players can read more.
 
-One question (phone use by drivers under 18) is based on state law, HRS §291C-137, and is labeled that way. Sign artwork is hand-drawn SVG following standard US (MUTCD) sign designs used in Hawaii. The manual covers sign shapes and colors on pages 43 to 51.
+One question (phone use by drivers under 18) is based on state law, HRS §291C-137, and is labeled that way. **Road signs are the real ones.** Sign images in `signs/` are the official US sign designs from the Federal Highway Administration's *Manual on Uniform Traffic Control Devices* (MUTCD), which Hawaii uses. They're public domain, and these SVG files come from [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:Diagrams_of_road_signs_of_the_United_States) (files named `MUTCD <code>.svg`). Each file is named by its official sign code (for example `W4-1R.svg` is Merge). Hand-drawn art is used only for shape-only drills, two generic guide-sign examples, and the slow-moving vehicle emblem (an emblem on vehicles, not a road sign). The manual covers sign shapes and colors on pages 43 to 51.
 
 This is a study aid, not the official test. Laws change between manual printings. Check the current manual and your county driver licensing office before your test, including the current test format (the 30-question / 80% Permit Day format is a practice approximation).
 
@@ -62,7 +62,8 @@ It's a static site: plain HTML, CSS and JavaScript, no build step.
 ```
 index.html        page shell
 css/style.css     all styles (dark "asphalt" theme, mobile first)
-js/signs.js       SVG sign library (53 signs)
+signs/            official MUTCD sign images (public domain), named by sign code
+js/signs.js       sign list: which official image each sign uses, plus hand-drawn shape drills
 js/questions.js   core question bank: id, topic, question, choices (first is correct), why, manual page
 js/questions-more.js  wordless sign questions plus extra rules and scenarios
 js/game.js        game logic: map, stops, spaced review, flashcards, Overtime, Permit Day, readiness, Coach Corner
