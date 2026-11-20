@@ -209,29 +209,139 @@
   function clearTick() { if (tick) { clearInterval(tick); tick = null; } }
   function go(fn) { clearTick(); document.onkeydown = null; fn(); window.scrollTo(0, 0); }
 
-  // Garage: pick or create a player
+  // ------------------------------------------------------------------
+  // Home (garage): animated island scene, drivers, what's inside, sign teaser
+  // ------------------------------------------------------------------
+  function heroScene() {
+    return `<svg class="hero-scene" viewBox="0 0 800 320" preserveAspectRatio="xMidYMax slice" role="img" aria-label="A car driving along the coast of Oʻahu at sunset, with Lēʻahi (Diamond Head) behind it">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2a7a"/><stop offset=".45" stop-color="#ff5f7e"/><stop offset=".8" stop-color="#ffb347"/><stop offset="1" stop-color="#ffd98a"/></linearGradient>
+        <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22c3d6"/><stop offset="1" stop-color="#0b5e7d"/></linearGradient>
+        <linearGradient id="sunfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#ffb347"/></linearGradient>
+        <clipPath id="above"><rect x="0" y="0" width="800" height="196"/></clipPath>
+      </defs>
+      <rect width="800" height="320" fill="url(#sky)"/>
+      <g class="clouds"><g class="cloud c1"><ellipse cx="110" cy="70" rx="48" ry="16" fill="#fff" opacity=".85"/><ellipse cx="140" cy="60" rx="30" ry="16" fill="#fff" opacity=".85"/></g>
+        <g class="cloud c2"><ellipse cx="420" cy="48" rx="56" ry="15" fill="#fff" opacity=".7"/><ellipse cx="450" cy="38" rx="28" ry="13" fill="#fff" opacity=".7"/></g></g>
+      <circle class="sun" cx="560" cy="182" r="62" fill="url(#sunfill)" clip-path="url(#above)"/>
+      <path d="M360 198 L430 168 Q470 150 500 132 Q520 122 540 136 L575 128 Q600 120 640 140 Q690 150 735 180 L790 198 Z" fill="#4a2463"/>
+      <path d="M500 132 Q520 122 540 136 L548 146 Q520 136 505 142 Z" fill="#5d3178"/>
+      <rect y="194" width="800" height="62" fill="url(#sea)"/>
+      <g class="waves"><path d="M0 212 q20 -6 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" fill="none" stroke="#bff3f8" stroke-width="2.5" opacity=".7"/>
+        <path d="M-20 232 q20 -6 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" fill="none" stroke="#bff3f8" stroke-width="2" opacity=".45"/></g>
+      <rect y="250" width="800" height="12" fill="#f3d9a4"/>
+      <rect y="262" width="800" height="58" fill="#2a2f3d"/>
+      <line class="dash" x1="0" y1="291" x2="820" y2="291" stroke="#ffcc00" stroke-width="5" stroke-dasharray="26 18"/>
+      <g class="palm" transform="translate(608,48) scale(.82)"><path d="M18 262 Q8 200 30 150" fill="none" stroke="#6b4123" stroke-width="10" stroke-linecap="round"/>
+        <path d="M30 150 Q0 132 -28 150 Q2 140 30 152 Z M30 150 Q54 124 86 136 Q56 138 30 152 Z M30 150 Q20 118 -6 108 Q28 120 32 150 Z M30 150 Q48 110 76 104 Q46 122 32 150 Z M30 150 Q60 152 78 178 Q50 160 30 152 Z" fill="#1f9d55"/></g>
+      <g class="palm p2" transform="translate(700,10) scale(.8)"><path d="M18 262 Q28 200 8 150" fill="none" stroke="#6b4123" stroke-width="10" stroke-linecap="round"/>
+        <path d="M8 150 Q-22 132 -50 150 Q-20 140 8 152 Z M8 150 Q32 124 64 136 Q34 138 8 152 Z M8 150 Q-2 118 -28 108 Q6 120 10 150 Z M8 150 Q26 110 54 104 Q24 122 10 150 Z" fill="#1f9d55"/></g>
+      <g class="hero-car"><g transform="translate(250,228) scale(1.6)">${carSVG(P() ? P().color : "#ff5a5f").replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g></g>
+    </svg>`;
+  }
+
+  function teaser() {
+    const pool = Q.filter((q) => q.t === "symbols" && q.sign && !q.cs);
+    const q = pool[Math.floor(Math.random() * pool.length)];
+    const opts = shuffle([q.c[0]].concat(shuffle(q.c.slice(1)).slice(0, 2)));
+    return { q, opts };
+  }
+  function renderTeaser() {
+    const box = app.querySelector("#teaser"); if (!box) return;
+    const { q, opts } = teaser();
+    box.innerHTML = `
+      <div class="teaser-sign">${signImg(q.sign)}</div>
+      <div class="teaser-body">
+        <div class="kicker">Quick quiz: no words, no problem?</div>
+        <h3>What does this sign mean?</h3>
+        <div class="teaser-choices">${opts.map((o, k) => `<button class="tchoice" data-k="${k}">${esc(o)}</button>`).join("")}</div>
+        <div class="teaser-fb" aria-live="polite"></div>
+      </div>`;
+    box.querySelectorAll(".tchoice").forEach((b) => b.onclick = () => {
+      const ok = opts[+b.dataset.k] === q.c[0];
+      box.querySelectorAll(".tchoice").forEach((x, j) => { x.disabled = true; if (opts[j] === q.c[0]) x.classList.add("right"); else if (x === b) x.classList.add("wrong"); });
+      box.querySelector(".teaser-fb").innerHTML = `<b>${ok ? pick(["Shoots! You know your signs.", "Chee-hoo! Nailed it.", "Right on!"]) : "Not quite. Good thing there's a whole boss level for this."}</b> <span class="muted">${esc(q.why)}</span>
+        <div class="row" style="margin-top:10px"><button class="btn ghost" id="another">Try another sign</button></div>`;
+      if (ok) confetti();
+      box.querySelector("#another").onclick = renderTeaser;
+    });
+  }
+
   function garage() {
     const ps = Object.values(store.profiles).sort((a, b) => b.created - a.created);
+    const tile = (sign, title, text, color) => `<div class="tile" style="--tile:${color}"><div class="tile-ico">${signImg(sign)}</div><div><b>${title}</b><p>${text}</p></div></div>`;
     app.innerHTML = `
-      <div class="hero">
-        <p class="muted small">Hawaii learner's permit study game</p>
-        <h1>Oʻahu <span>Road Trip</span></h1>
-        <div class="road-stripe"></div>
-        <p>Drive around the island. Clear each stop with 80% or better to unlock the next one, the same score you need on the real permit test. Then take on <b>Permit Day</b>.</p>
+      <div class="home-hero">
+        ${heroScene()}
+        <div class="hero-text">
+          <span class="badge-pill">Hawaii learner's permit study game</span>
+          <h1 class="title-pop"><span class="t1">Oʻahu</span> <span class="t2">Road Trip</span></h1>
+          <p class="hero-sub">Drive the island. Beat the bosses. <b>Pass your permit test.</b></p>
+        </div>
       </div>
-      <h2>Who's driving?</h2>
-      <div class="profiles">
-        ${ps.map((p) => `<button class="profile" data-id="${p.id}">${carSVG(p.color, "car-badge")}<span><span class="name">${esc(p.name)}</span><br><span class="meta">Lv ${level(p.xp).n} · ${p.xp} XP</span></span></button>`).join("")}
-        <button class="profile new-profile" id="new">+ New driver</button>
-        <button class="profile new-profile" id="restore">Restore from save code</button>
-      </div>
+
+      <section class="garage">
+        <h2>${ps.length ? "Who's driving?" : "Ready to roll?"}</h2>
+        <div class="profiles">
+          ${ps.map((p) => {
+            const done = STOPS.filter((s) => (p.best[s.id] || 0) >= 2).length;
+            return `<button class="profile garage-card" data-id="${p.id}" style="--car:${p.color}">
+              ${carSVG(p.color, "car-badge")}
+              <span class="gc-body"><span class="name">${esc(p.name)}</span>
+                <span class="meta">Lv ${level(p.xp).n} ${esc(level(p.xp).title)} · ${p.streak} day streak</span>
+                <span class="mini-bar"><i style="width:${Math.round((done / STOPS.length) * 100)}%"></i></span>
+                <span class="meta">${done}/${STOPS.length} stops cleared</span></span>
+              <span class="go-arrow" aria-hidden="true">›</span></button>`;
+          }).join("")}
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary big start-btn" id="new">${ps.length ? "+ New driver" : "Start your engine"}</button>
+          <button class="btn ghost" id="restore">Restore from save code</button>
+        </div>
+      </section>
+
+      <section class="teaser card" id="teaser"></section>
+
+      <section>
+        <h2 class="section-title">What's on the road</h2>
+        <div class="tiles">
+          ${tile("guide", "12 island stops", "Kapolei to Haleʻiwa, one topic per stop. Score 80% to unlock the next.", "#19b5c8")}
+          ${tile("octagon", "Sign Showdown boss", "Signs with no words. Know them by shape, color and picture.", "#ff5a5f")}
+          ${tile("signal", "Overtime", "60-second lightning round. How many can you get?", "#ffcc00")}
+          ${tile("interstate", "Permit Day", "The final boss: a full 30-question practice test.", "#b07cff")}
+          ${tile("crossroad", "Streaks and badges", "Level up from Passenger to Kamaʻāina Driver.", "#3ddc84")}
+          ${tile("school", "Coach Corner", "A study plan and car-ride challenges for parents too.", "#ff8a3d")}
+        </div>
+      </section>
+
       <div class="footer">
-        <p>Progress saves only on this device. No accounts, no tracking. Use a nickname, not your real name.</p>
+        <p>Free, no ads, no accounts. Progress saves only on this device (use a save code to back it up). Use a nickname, not your real name.</p>
         <p>Questions are based on the official Hawaii Driver's Manual (Hawaii DOT). This is a study aid, not the official test. Always check the current manual and your county driver licensing office.</p>
+        <p>Made with aloha in Honolulu for the local tech and AI community. <a href="https://github.com/lani-byte/oahu-road-trip" target="_blank" rel="noopener">Open source on GitHub</a>.</p>
       </div>`;
-    app.querySelectorAll(".profile[data-id]").forEach((b) => b.onclick = () => { store.active = b.dataset.id; save(); go(map); });
+    app.querySelectorAll(".garage-card").forEach((b) => b.onclick = () => { store.active = b.dataset.id; save(); go(map); });
     app.querySelector("#new").onclick = () => go(createProfile);
     app.querySelector("#restore").onclick = () => go(restoreScreen);
+    renderTeaser();
+  }
+
+  // Confetti for big wins (skipped when the device prefers reduced motion)
+  function confetti() {
+    if (reduceMotion) return;
+    const colors = ["#ffcc00", "#ff5a5f", "#19b5c8", "#3ddc84", "#b07cff", "#ff8a3d"];
+    const wrap = document.createElement("div"); wrap.className = "confetti"; wrap.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 90; i++) {
+      const c = document.createElement("i");
+      c.style.left = Math.random() * 100 + "vw";
+      c.style.background = colors[i % colors.length];
+      c.style.animationDelay = Math.random() * 0.4 + "s";
+      c.style.animationDuration = 1.6 + Math.random() * 1.2 + "s";
+      c.style.setProperty("--drift", (Math.random() * 160 - 80) + "px");
+      c.style.setProperty("--spin", (Math.random() * 720 + 360) + "deg");
+      wrap.appendChild(c);
+    }
+    document.body.appendChild(wrap);
+    setTimeout(() => wrap.remove(), 3200);
   }
 
   function createProfile() {
@@ -781,6 +891,7 @@
       if (bonus) { p.xp += bonus; s.xp += bonus; }
       if (got >= 1) award("first");
       if (right === LEG_LEN) award("perfect");
+      if (got >= 2) setTimeout(confetti, 150);
       if (st.id === "makapuu" && got === 3) award("signs");
       if (STOPS.every((x) => (p.best[x.id] || 0) >= 2)) award("island");
       const nextI = s.stop + 1;
@@ -821,7 +932,7 @@
       p.permitHist = (p.permitHist || []).concat(right).slice(-10);
       if (p.permitBest === null || right > p.permitBest) p.permitBest = right;
       const gain = right * 3 + (pass ? 100 : 0); p.xp += gain;
-      if (pass) award("permit");
+      if (pass) { award("permit"); setTimeout(confetti, 150); }
       save();
       app.innerHTML = `<div class="card"><div class="result-hero"><div class="small muted">Permit Day practice test</div>
           <h2>${pass ? "You passed!" : "Not yet"}</h2><div class="big-stars">${right}/${PERMIT_LEN}</div>
