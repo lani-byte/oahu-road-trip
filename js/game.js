@@ -278,7 +278,7 @@
         <div class="hero-text">
           <span class="badge-pill">Hawaii learner's permit study game</span>
           <h1 class="title-pop"><span class="t1">Oʻahu</span> <span class="t2">Road Trip</span></h1>
-          <p class="hero-sub">Drive the island. Beat the bosses. <b>Pass your permit test.</b></p>
+          <p class="hero-sub">Learn the rules. Try them out. <b>Earn your way around Oʻahu.</b></p>
         </div>
       </div>
 
@@ -297,15 +297,15 @@
           }).join("")}
         </div>
         <div class="row" style="margin-top:14px">
-          <button class="btn primary big start-btn" id="new">${ps.length ? "+ New driver" : "Start your engine"}</button>
+          <button class="btn primary big start-btn" id="new">${ps.length ? "+ New driver" : "Start learning"}</button>
           <button class="btn ghost" id="restore">Restore from save code</button>
         </div>
       </section>
 
-      <section class="teaser card" id="teaser"></section>
+      <section class="card learning-intro"><h2>Your road trip starts here</h2><p>Pick a nickname and a car. We’ll teach you before we test you.</p><ol class="journey-steps"><li><b>Learn</b><span>Short road tips, one at a time</span></li><li><b>Try it</b><span>Practice with help, no lost stars</span></li><li><b>Earn stars</b><span>Take the challenge and unlock your next stop</span></li></ol></section>
 
       <section>
-        <h2 class="section-title">What's on the road</h2>
+        <details class="menu-group"><summary>Explore the game modes</summary>
         <div class="tiles">
           ${tile("guide", "12 island stops", "Kapolei to Haleʻiwa, one topic per stop. Score 80% to unlock the next.", "#19b5c8")}
           ${tile("octagon", "Sign Showdown boss", "Signs with no words. Know them by shape, color and picture.", "#ff5a5f")}
@@ -314,6 +314,7 @@
           ${tile("crossroad", "Streaks and badges", "Level up from Passenger to Kamaʻāina Driver.", "#3ddc84")}
           ${tile("school", "Coach Corner", "A study plan and car-ride challenges for parents too.", "#ff8a3d")}
         </div>
+        </details>
       </section>
 
       <div class="footer">
@@ -324,7 +325,7 @@
     app.querySelectorAll(".garage-card").forEach((b) => b.onclick = () => { store.active = b.dataset.id; save(); go(map); });
     app.querySelector("#new").onclick = () => go(createProfile);
     app.querySelector("#restore").onclick = () => go(restoreScreen);
-    renderTeaser();
+
   }
 
   // Confetti for big wins (skipped when the device prefers reduced motion)
@@ -434,18 +435,26 @@
     const cleared = STOPS.filter((s) => (p.best[s.id] || 0) >= 2).length;
     app.innerHTML = `
       ${hud()}
+      <section class="card next-drive">
+        <div class="kicker">${cleared ? "Your next adventure" : "Start here · Stop 1 of 12"}</div>
+        <h1>${nx >= 0 ? esc(STOPS[nx].name) + ": " + esc(STOPS[nx].title) : "You’ve travelled the island!"}</h1>
+        <p>Learn a road tip. Try it with help. Then earn stars in a 10-question challenge.</p>
+        <button class="btn primary big" id="m-next">${nx >= 0 ? (cleared ? "Continue learning" : "Start learning in Kapolei") : "Revisit your first stop"}</button>
+        <p class="small muted">No timer on the learning route. Mistakes are part of the trip.</p>
+      </section>
       <div class="map-wrap">${mapSVG()}</div>
-      <p class="small muted center" style="margin-top:8px">${cleared}/${STOPS.length} stops cleared${nx >= 0 ? ` · Next up: <b>${esc(STOPS[nx].name)}</b>` : " · Island complete! Permit Day is calling."}</p>
-      ${readyCard()}
-      <div class="modes">
-        ${nx >= 0 ? `<button class="mode" id="m-next"><h3>Drive to ${esc(STOPS[nx].name)}</h3><p>${esc(STOPS[nx].title)}: ${esc(STOPS[nx].blurb)}</p><span class="pill">${LEG_LEN} questions · need ${STAR_2} to clear</span></button>` : ""}
+      <p class="small muted center">${cleared}/${STOPS.length} stops cleared · Select an unlocked stop to learn or replay.</p>
+      <details class="menu-group"><summary>Practice & quick games <span>Flashcards, signs, daily review and speed rounds</span></summary><div class="modes">
         <button class="mode pit" id="m-pit"><h3>Pit Stop</h3><p>Start here each day: review what you missed or are due to see again.</p><span class="pill">${due ? due + " due now" : "Nothing due"}</span></button>
         <button class="mode" id="m-flash"><h3>Flashcards</h3><p>Think of the answer first, then flip. Pick any topic, even locked ones.</p><span class="pill">Self-check</span></button>
         <button class="mode boss" id="m-sprint"><h3>Sign Sprint</h3><p>${SPRINT_LEN} signs, most with no words. Know them by shape, color and picture.</p><span class="pill">Mastered: ${Math.round(mastery(topicIds("symbols")) * 100)}%</span></button>
         <button class="mode ot" id="m-ot"><h3>Overtime</h3><p>${OT_SECONDS}-second lightning round from every stop you've unlocked.</p><span class="pill">Best: ${p.otBest}</span></button>
+      </div></details><details class="menu-group"><summary>Test readiness & coach <span>Permit Day and Coach Corner</span></summary><div class="modes">
         <button class="mode boss" id="m-permit"><h3>Permit Day</h3><p>Practice test: ${PERMIT_LEN} questions from all over the island. No hints until the end.</p><span class="pill">${p.permitBest === null ? "Not tried yet" : "Best: " + p.permitBest + "/" + PERMIT_LEN}</span></button>
         <button class="mode pit" id="m-coach"><h3>Coach Corner</h3><p>Study plan, car-ride sign spotting and "why" questions for parents.</p><span class="pill">For drivers and parents</span></button>
       </div>
+      </details>
+      <details class="menu-group"><summary>Your route <span>All 12 stops and your stars</span></summary>
       <h3 style="margin-top:22px">All stops</h3>
       <div class="stop-list">
         ${STOPS.map((s, i) => {
@@ -455,7 +464,11 @@
             <span class="st">${st ? starStr(st) : s.boss ? "BOSS" : ""}</span></button>`;
         }).join("")}
       </div>
+      </details>
+      <details class="menu-group"><summary>Progress & driver tools <span>Readiness, badges, backup and driver settings</span></summary>
+      ${readyCard()}
       <div class="row" style="margin-top:22px"><button class="btn ghost" id="m-badges">Badges (${p.badges.length}/${BADGES.length})</button><button class="btn ghost" id="m-save">Save code backup</button><span class="spacer"></span><button class="linkish" id="m-del">Delete this driver</button></div>
+      </details>
       <div class="footer"><p>Based on the official Hawaii Driver's Manual (Hawaii DOT). Study aid only. Page numbers in each explanation point to the manual so you can read more.</p></div>`;
     wireHud();
     const openStop = (i) => { if (unlocked(i)) go(() => startLeg(i)); else toast("Clear the stop before it with 2 stars first"); };
@@ -466,7 +479,7 @@
     const pd = app.querySelector('.map [data-permit]');
     pd.onclick = () => go(startPermit); pd.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(startPermit); } };
     app.querySelectorAll(".stop-row").forEach((b) => b.onclick = () => openStop(+b.dataset.i));
-    const mn = app.querySelector("#m-next"); if (mn) mn.onclick = () => openStop(nx);
+    const mn = app.querySelector("#m-next"); if (mn) mn.onclick = () => openStop(nx >= 0 ? nx : 0);
     app.querySelector("#m-pit").onclick = () => go(startPit);
     app.querySelector("#m-ot").onclick = () => go(startOT);
     app.querySelector("#m-permit").onclick = () => go(startPermit);
@@ -619,7 +632,36 @@
   function startLeg(i) {
     const s = STOPS[i];
     const ids = pickFrom(Q.filter((q) => q.t === s.topic).map((q) => q.id), LEG_LEN);
-    begin("leg", ids, { stop: i });
+    go(() => roadLesson(i, ids, 0));
+  }
+  // Learning does not grade cards, award mastery, or alter challenge scores.
+  function roadLesson(stop, ids, at) {
+    const s = STOPS[stop];
+    if (at >= ids.length) {
+      app.innerHTML = `<div class="card stack learning-intro"><div class="kicker">Road tips complete</div><h1>Ready to earn your stars?</h1><p>You’ve learned and practiced ${ids.length} road tips in ${esc(s.name)}. Now try them without the hints. Get ${STAR_2} of ${LEG_LEN} right to unlock the next stop.</p><p>Missed questions get another practice lap. Learning comes first.</p><div class="row"><button class="btn primary big" id="challenge">Start the star challenge</button><button class="btn ghost" id="review">Review the tips again</button><button class="btn ghost" id="lesson-map">Back to map</button></div></div>`;
+      app.querySelector("#challenge").onclick = () => begin("leg", shuffle(ids.slice()), { stop });
+      app.querySelector("#review").onclick = () => go(() => roadLesson(stop, ids, 0));
+      app.querySelector("#lesson-map").onclick = () => go(map);
+      return;
+    }
+    const q = QBY[ids[at]];
+    app.innerHTML = `<div class="drive-top"><button class="btn ghost" id="lesson-map">Map</button><div><div class="small muted">${esc(s.name)} · ${esc(s.title)}</div><b>Road tip ${at + 1} of ${ids.length}</b></div></div>
+      <ol class="journey-steps"><li class="current"><b>1. Learn</b></li><li><b>2. Try it</b></li><li><b>3. Earn stars</b></li></ol>
+      <div class="card stack lesson-card">${q.sign ? signSVG(q.sign) : ""}<div class="kicker">Your roadside briefing</div><h2>${esc(q.q)}</h2>
+      ${q.cs ? signImg(q.c[0]) : ""}<p class="lesson-answer">${esc(label(q, q.c[0]))}</p><p>${esc(q.why)}</p><p class="small muted">Source: Hawaii Driver’s Manual · ${esc(q.src)}</p><p class="small muted">Before you try it: explain the tip in your own words.</p><button class="btn primary big" id="try-tip">Got it · let me try</button></div>`;
+    app.querySelector("#lesson-map").onclick = () => go(map);
+    app.querySelector("#try-tip").onclick = () => {
+      const opts = shuffle(q.c.map((text, i) => ({text, ok:i === 0})));
+      app.innerHTML = `<div class="drive-top"><button class="btn ghost" id="practice-map">Map</button><b>Try it · ${at + 1} of ${ids.length}</b></div><div class="card stack"><div class="kicker">Practice lap · no score, no timer</div>${q.sign ? signSVG(q.sign) : ""}<h2>${esc(q.q)}</h2><div class="choices ${q.cs ? "sign-choices" : ""}">${opts.map((o,k) => `<button class="choice" data-practice="${k}" aria-label="${esc(label(q,o.text))}">${q.cs ? signImg(o.text,"choice-sign") : esc(o.text)}</button>`).join("")}</div><div id="practice-feedback" aria-live="polite"></div></div>`;
+      app.querySelector("#practice-map").onclick = () => go(map);
+      app.querySelectorAll("[data-practice]").forEach(b => b.onclick = () => {
+        const ok = opts[+b.dataset.practice].ok;
+        app.querySelectorAll("[data-practice]").forEach(x => { x.disabled = true; if(opts[+x.dataset.practice].ok) x.classList.add("right"); else if(x === b) x.classList.add("wrong"); });
+        app.querySelector("#practice-feedback").innerHTML = `<h3>${ok ? "Nice driving!" : "A practice detour. Let’s learn from it."}</h3><p>${esc(q.why)}</p><p class="small muted">${esc(q.src)} · Practice does not affect stars or mastery.</p><button class="btn primary" id="next-tip">${at + 1 < ids.length ? "Next road tip" : "Finish practice"}</button>`;
+        app.querySelector("#next-tip").onclick = () => go(() => roadLesson(stop, ids, at + 1));
+      });
+      window.scrollTo(0,0);
+    };
   }
   function startPit() {
     let ids = dueCards().slice(0, 15), label = "Pit Stop";
