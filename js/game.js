@@ -7,6 +7,7 @@
   // ------------------------------------------------------------------
   // Data
   // ------------------------------------------------------------------
+  const MANUAL_URL = "https://hidot.hawaii.gov/highways/files/2024/11/2023-Hawaii-Drivers-Manual_5.375x8.375_Final-r3-Digital-071924web.pdf";
   const Q = window.ORT_QUESTIONS || [];
   const QBY = Object.fromEntries(Q.map((q) => [q.id, q]));
 
@@ -28,12 +29,12 @@
   const PERMIT_STOP = { name: "Kapālama Hale", x: 578, y: 532 };
 
   const LEG_LEN = 10;          // questions per stop
-  const STAR_2 = 8;            // 80%: same as the real test's pass mark
+  const STAR_2 = 8;            // Game progression threshold; not an official test specification
   const STAR_1 = 6;
   const PERMIT_LEN = 30;
   const PERMIT_PASS = 24;      // 80%
   const OT_SECONDS = 60;
-  const READY_SCORE = 27;      // 90% on Permit Day, twice in a row = a safety margin over 80%
+  const READY_SCORE = 27;      // Game practice goal, not a validated prediction of exam success
   const SPRINT_LEN = 15;
   const FLASH_LEN = 15;
   const BOXES = [0, 1, 2, 4, 7, 14]; // spaced-review intervals in days
@@ -54,7 +55,7 @@
     { id: "pit",     ico: "PIT",  name: "Pit Crew",        how: "Finish 5 Pit Stops" },
     { id: "island",  ico: "360",  name: "Round the Island", how: "2+ stars at every stop" },
     { id: "permit",  ico: "PASS", name: "Test Passer",     how: "Pass a Permit Day practice test" },
-    { id: "ready",   ico: "100",  name: "Permit Ready",    how: "Meet all three readiness checks" },
+    { id: "ready",   ico: "100",  name: "Practice Milestone",    how: "Meet all three practice checks" },
   ];
 
   // ------------------------------------------------------------------
@@ -112,6 +113,23 @@
     return Object.entries(p.cards).filter(([id, c]) => QBY[id] && c.due <= t).sort((a, b) => a[1].box - b[1].box).map(([id]) => id);
   }
 
+  const CONTENT_REVIEW = "2026-11-23-accuracy";
+  const CORRECTED_IDS = ["a14", "h2", "a3", "a10", "e5", "f1", "f2", "f12", "e14", "b17", "s15"];
+  function refreshCorrectedContent(p) {
+    if (p.contentReview === CONTENT_REVIEW) return;
+    CORRECTED_IDS.forEach(id => {
+      if (p.cards[id]) p.cards[id] = Object.assign({}, p.cards[id], { box: 0, due: today() });
+    });
+    p.contentReview = CONTENT_REVIEW;
+    save();
+  }
+
+  function sourceHTML(q) {
+    const page = /(?:^|\s)p\.\s*(\d+)/.exec(q.src || "");
+    const url = q.url || (q.id === "b4" ? "https://data.capitol.hawaii.gov/hrscurrent/Vol05_Ch0261-0319/HRS0286/HRS_0286-0110.htm" : "") || (MANUAL_URL + (page ? "#page=" + page[1] : ""));
+    return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(q.src || "Official study source")}</a>`;
+  }
+
   function carSVG(color, cls) {
     return `<svg class="${cls || ""}" viewBox="0 0 64 40" aria-hidden="true"><path d="M6 26 L12 14 Q14 10 19 10 H42 Q47 10 50 14 L56 22 Q60 23 60 28 V31 H4 V28 Q4 26 6 26 Z" fill="${color}" stroke="#0d1119" stroke-width="2.5"/><path d="M17 14 H30 V22 H12 Z M33 14 H44 L50 22 H33 Z" fill="#bfe9f2" stroke="#0d1119" stroke-width="2"/><circle cx="16" cy="31" r="6" fill="#0d1119"/><circle cx="16" cy="31" r="2.5" fill="#a8b1c7"/><circle cx="48" cy="31" r="6" fill="#0d1119"/><circle cx="48" cy="31" r="2.5" fill="#a8b1c7"/><rect x="55" y="24" width="4" height="3" rx="1" fill="#fff6c2"/></svg>`;
   }
@@ -140,8 +158,9 @@
     const p = P(), hist = p.permitHist || [];
     const cleared = STOPS.every((s) => (p.best[s.id] || 0) >= 2);
     const m = mastery(Q.map((q) => q.id));
+    const topicReady = STOPS.every(s => mastery(topicIds(s.topic)) >= 0.8);
     const lastTwo = hist.length >= 2 && hist.slice(-2).every((x) => x >= READY_SCORE);
-    return { cleared, m, lastTwo, ready: cleared && m >= 0.8 && lastTwo };
+    return { cleared, m, topicReady, lastTwo, ready: cleared && topicReady && lastTwo };
   }
 
   // Sound: tiny optional beeps
@@ -431,6 +450,7 @@
 
   function map() {
     const p = P(); if (!p) return go(garage);
+    refreshCorrectedContent(p);
     const due = dueCards().length, nx = nextStopIndex();
     const cleared = STOPS.filter((s) => (p.best[s.id] || 0) >= 2).length;
     app.innerHTML = `
@@ -648,7 +668,7 @@
     app.innerHTML = `<div class="drive-top"><button class="btn ghost" id="lesson-map">Map</button><div><div class="small muted">${esc(s.name)} · ${esc(s.title)}</div><b>Road tip ${at + 1} of ${ids.length}</b></div></div>
       <ol class="journey-steps"><li class="current"><b>1. Learn</b></li><li><b>2. Try it</b></li><li><b>3. Earn stars</b></li></ol>
       <div class="card stack lesson-card">${q.sign ? signSVG(q.sign) : ""}<div class="kicker">Your roadside briefing</div><h2>${esc(q.q)}</h2>
-      ${q.cs ? signImg(q.c[0]) : ""}<p class="lesson-answer">${esc(label(q, q.c[0]))}</p><p>${esc(q.why)}</p><p class="small muted">Source: Hawaii Driver’s Manual · ${esc(q.src)}</p><p class="small muted">Before you try it: explain the tip in your own words.</p><button class="btn primary big" id="try-tip">Got it · let me try</button></div>`;
+      ${q.cs ? signImg(q.c[0]) : ""}<p class="lesson-answer">${esc(label(q, q.c[0]))}</p><p>${esc(q.why)}</p><p class="small muted">Source: ${sourceHTML(q)}</p><p class="small muted">Before you try it: explain the tip in your own words.</p><button class="btn primary big" id="try-tip">Got it · let me try</button></div>`;
     app.querySelector("#lesson-map").onclick = () => go(map);
     app.querySelector("#try-tip").onclick = () => {
       const opts = shuffle(q.c.map((text, i) => ({text, ok:i === 0})));
@@ -657,7 +677,7 @@
       app.querySelectorAll("[data-practice]").forEach(b => b.onclick = () => {
         const ok = opts[+b.dataset.practice].ok;
         app.querySelectorAll("[data-practice]").forEach(x => { x.disabled = true; if(opts[+x.dataset.practice].ok) x.classList.add("right"); else if(x === b) x.classList.add("wrong"); });
-        app.querySelector("#practice-feedback").innerHTML = `<h3>${ok ? "Nice driving!" : "A practice detour. Let’s learn from it."}</h3><p>${esc(q.why)}</p><p class="small muted">${esc(q.src)} · Practice does not affect stars or mastery.</p><button class="btn primary" id="next-tip">${at + 1 < ids.length ? "Next road tip" : "Finish practice"}</button>`;
+        app.querySelector("#practice-feedback").innerHTML = `<h3>${ok ? "Nice driving!" : "A practice detour. Let’s learn from it."}</h3><p>${esc(q.why)}</p><p class="small muted">${sourceHTML(q)} · Practice does not affect stars or mastery.</p><button class="btn primary" id="next-tip">${at + 1 < ids.length ? "Next road tip" : "Finish practice"}</button>`;
         app.querySelector("#next-tip").onclick = () => go(() => roadLesson(stop, ids, at + 1));
       });
       window.scrollTo(0,0);
@@ -694,19 +714,19 @@
     begin("sprint", shuffle(pickFrom(pool, SPRINT_LEN)));
   }
 
-  // Readiness: three checks that together mean "book the test"
+  // Game practice goals, not certification or a guarantee of passing.
   function readyCard() {
     const r = readiness(), hist = P().permitHist || [];
     const row = (ok, text) => `<li class="${ok ? "ok" : ""}"><span class="tick">${ok ? "✓" : ""}</span>${text}</li>`;
     return `<div class="card ready-card ${r.ready ? "is-ready" : ""}">
-      <div class="row"><h3>Permit readiness</h3><span class="spacer"></span><b class="ready-pct">${r.ready ? "READY" : Math.round(r.m * 100) + "% mastered"}</b></div>
+      <div class="row"><h3>Practice progress</h3><span class="spacer"></span><b class="ready-pct">${r.ready ? "GOAL MET" : Math.round(r.m * 100) + "% mastered"}</b></div>
       <div class="xpbar"><i style="width:${Math.round(r.m * 100)}%"></i></div>
       <ul class="checks">
         ${row(r.cleared, `Clear all ${STOPS.length} stops (2+ stars each)`)}
-        ${row(r.m >= 0.8, "Master 80% of all questions (3 right in a row each)")}
+        ${row(r.topicReady, "Master at least 80% in every topic (3 right in a row each)")}
         ${row(r.lastTwo, `Score ${READY_SCORE}/${PERMIT_LEN}+ on your last two Permit Days${hist.length ? ` (last: ${hist.slice(-2).join(", ")})` : ""}`)}
       </ul>
-      <p class="small muted" style="margin:6px 0 0">${r.ready ? "You've met every check. Keep doing a daily Pit Stop until test day." : "The real test needs 80%. These checks build a safety margin so test-day nerves don't matter."}</p>
+      <p class="small muted" style="margin:6px 0 0">${r.ready ? "You’ve met the game’s practice goals. Review the official manual and county requirements before booking a test." : "Game progress is a study guide, not proof of test readiness or safe driving skill. Use the official manual and supervised practice too."}</p>
     </div>`;
   }
 
@@ -744,7 +764,7 @@
         <div class="question">${esc(q.q)}</div>
         <div id="back" class="hidden">
           ${q.cs ? `<div class="sign-art">${signImg(q.c[0])}</div>` : ""}
-          <div class="feedback"><div class="head">${esc(label(q, q.c[0]))}</div><div>${esc(q.why)}</div><div class="src">Hawaii Driver's Manual, ${esc(q.src)}</div></div>
+          <div class="feedback"><div class="head">${esc(label(q, q.c[0]))}</div><div>${esc(q.why)}</div><div class="src">Source: ${sourceHTML(q)}</div></div>
           <div class="row" style="margin-top:12px"><button class="btn go big" id="yes">Got it</button><button class="btn danger big" id="no">Not yet</button></div>
         </div>
         <div class="row" id="front" style="margin-top:8px"><button class="btn primary big" id="flip">Flip card</button><span class="small muted">Answer it in your head first</span></div>
@@ -769,7 +789,7 @@
     ["Why keep your wheels straight while waiting to turn left?", "If someone rear-ends you, straight wheels keep you from being pushed into oncoming traffic."],
     ["Why are motorcycles easy to misjudge?", "They're small, so they look farther away and slower than they are. Look twice."],
     ["Why is the alcohol limit 0.02 for drivers under 21?", "It's zero tolerance: under 21, any real amount of alcohol is illegal, and new drivers are most affected by even small amounts."],
-    ["Why never stop at the end of a freeway on-ramp?", "Merging from a stop into 55+ mph traffic is very hard and dangerous. Match speed instead."],
+    ["How can you keep a freeway merge safe in heavy traffic?", "Leave room to build speed for a safe gap, yield to freeway traffic, and follow ramp controls. Slow or stop when traffic or safety requires it; never force a merge."],
     ["Why use low beams, not high beams, in fog?", "High beams bounce off the fog and blind you."],
     ["Why turn your wheels toward the curb when parking on a hill?", "If the brakes slip, the curb stops the car and it rolls away from traffic, not into it."],
     ["Why can't you pass within 100 feet of an intersection?", "Cars may turn or pull out there, and you'd be in the wrong lane with no escape."],
@@ -782,15 +802,15 @@
     app.innerHTML = `${hud()}
       <div class="card stack" style="margin-top:14px">
         <h2>Coach Corner</h2>
-        <p>For drivers and the adults helping them. This is the plan that works best, based on learning research.</p>
-        <h3>The plan: 15 to 20 minutes a day for 2 to 3 weeks</h3>
+        <p>For learners and the adults helping them. Use this suggested routine alongside the official manual, required driver education and supervised driving.</p>
+        <h3>A suggested routine: 15 to 20 minutes a day</h3>
         <ol class="plan">
           <li><b>Start every day with a Pit Stop.</b> It brings back what you're about to forget. Short daily sessions beat cramming the night before.</li>
           <li><b>Then drive one stop or do a Flashcard deck.</b> Answering from memory (not rereading) is what makes facts stick.</li>
           <li><b>Read every explanation, especially on misses.</b> Then say the rule out loud in your own words. Look up the manual page if it still doesn't click.</li>
           <li><b>Do a Sign Sprint every few days.</b> The test shows signs with no words. Learn the shape and color first, then the picture.</li>
           <li><b>Mix it up.</b> Once most stops are cleared, use Overtime and Permit Day. Mixed topics feel harder, but that's what the real test does.</li>
-          <li><b>Book the test when all three readiness checks are green.</b> Two practice tests in a row at 90% gives you a margin for nerves.</li>
+          <li><b>Use game goals to find what needs more practice.</b> Read the whole official manual and check county requirements. Game scores do not guarantee a pass or establish driving skill.</li>
         </ol>
         <h3>On every car ride: be the navigator</h3>
         <p class="muted">Before you ever drive, you can practice as a passenger. Call out each sign and what it means, and point out lane lines, signals and who has the right of way at each intersection. Check off signs as you spot them in real life.</p>
@@ -799,11 +819,13 @@
         <h3>Car Talk: "why" questions for parents to ask</h3>
         <p class="muted">Knowing <i>why</i> a rule exists makes it much easier to remember and to use on the road. Ask one per ride. Tap to see a good answer.</p>
         ${CAR_TALK.map(([qq, a]) => `<details class="talk"><summary>${esc(qq)}</summary><p>${esc(a)}</p></details>`).join("")}
+        <h3>Official study resources</h3>
+        <ul class="plan"><li><a href="${MANUAL_URL}" target="_blank" rel="noopener">Current HDOT English driver manual</a>: study the full guide.</li><li><a href="${MANUAL_URL}#page=99" target="_blank" rel="noopener">Official sample questions and illustrations</a>: use the page references to check your reasoning.</li><li><a href="https://hidot.hawaii.gov/online-learners-permit-test/" target="_blank" rel="noopener">HDOT online permit test requirements</a>: currently describes 25 questions and a one-hour limit. This game’s 30-question Permit Day is extra practice, not a replica.</li></ul>
         <h3>Before test day</h3>
         <ul class="plan">
           <li>Read the official <a href="https://hidot.hawaii.gov/highways/library/motor-vehicle-safety-office/" target="_blank" rel="noopener">Hawaii Driver's Manual</a> once, start to finish. This game covers the key facts, but the manual is the source.</li>
           <li>Check your county driver licensing office's website for the documents to bring, fees, hours and appointments. Under 18 needs parent or guardian consent.</li>
-          <li>The test also includes a vision screening.</li>
+          <li>Getting a permit also requires a vision screening. Completing a knowledge test alone does not issue a permit.</li>
           <li>Read each question all the way through. Watch for words like <i>never</i>, <i>always</i>, <i>except</i> and <i>at least</i>.</li>
         </ul>
         <button class="btn primary" id="back">Back to the map</button>
@@ -893,7 +915,7 @@
           <div class="head">${o.ok ? pick(["Nice!", "Clean drive!", "Shoots!", "Right on!", "Smooth!"]) : "Pothole!"}</div>
           ${o.ok ? (q.cs ? `<div>That sign means: <b>${esc(label(q, correct))}</b></div>` : "") : `<div>Answer: <b>${esc(label(q, correct))}</b></div>`}
           <div>${esc(q.why)}</div>
-          <div class="src">Hawaii Driver's Manual, ${esc(q.src)}</div>
+          <div class="src">Source: ${sourceHTML(q)}</div>
         </div>
         <div class="row" style="margin-top:12px"><button class="btn go big" id="next">Keep driving</button><span class="small muted">or press Enter</span></div>`;
       const nb = app.querySelector("#next"); nb.focus();
@@ -918,7 +940,7 @@
     if (!rows.length) return "";
     return `<h3 style="margin-top:16px">Review</h3><ul class="review-list">${rows.map((r) => {
       const q = QBY[r.id];
-      return `<li><div><b>${esc(q.q)}</b></div>${q.sign ? signImg(q.sign, "review-sign") : ""}${q.cs ? signImg(q.c[0], "review-sign") : ""}<div class="ans">${esc(label(q, q.c[0]))}</div>${r.picked && r.picked !== q.c[0] ? `<div class="yours small">You picked: ${esc(label(q, r.picked))}</div>` : ""}<div class="small muted">${esc(q.why)} (Manual ${esc(q.src)})</div></li>`;
+      return `<li><div><b>${esc(q.q)}</b></div>${q.sign ? signImg(q.sign, "review-sign") : ""}${q.cs ? signImg(q.c[0], "review-sign") : ""}<div class="ans">${esc(label(q, q.c[0]))}</div>${r.picked && r.picked !== q.c[0] ? `<div class="yours small">You picked: ${esc(label(q, r.picked))}</div>` : ""}<div class="small muted">${esc(q.why)} (Source: ${sourceHTML(q)})</div></li>`;
     }).join("")}</ul>`;
   }
 
