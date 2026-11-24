@@ -1,0 +1,5 @@
+{
+  "name":"oahu-road-trip","private":true,"type":"module",
+  "scripts":{"build":"node scripts/build-question-bank.mjs","test":"node --test test/*.test.mjs","dev":"npm run build && wrangler pages dev . --binding APP_ORIGIN=http://127.0.0.1:8789 --binding STRIPE_MODE=test --binding TAX_MODE=none --binding RATE_LIMIT_SALT=local-development-only --compatibility-date=2026-03-01 --port 8789 --d1 DB"},
+  "dependencies":{"stripe":"23.2.0"},"devDependencies":{"wrangler":"4.70.0"}
+}

@@ -1,5 +1,5 @@
 /* Oʻahu Road Trip: a Hawaii permit study game.
-   Plain JavaScript, no build step, no server. Progress lives only in this
+   Plain JavaScript with server-verified Full Island Pass access. Progress lives in this
    browser's localStorage, per player profile. No names leave the device. */
 (function () {
   "use strict";
@@ -8,8 +8,25 @@
   // Data
   // ------------------------------------------------------------------
   const MANUAL_URL = "https://hidot.hawaii.gov/highways/files/2024/11/2023-Hawaii-Drivers-Manual_5.375x8.375_Final-r3-Digital-071924web.pdf";
-  const Q = window.ORT_QUESTIONS || [];
-  const QBY = Object.fromEntries(Q.map((q) => [q.id, q]));
+  let Q = [], QBY = {}, TOPIC_IDS = {};
+  let access = {active:false,owner:false,hasRecoveryCode:false};
+  let checkoutAvailable = false, testMode = true, questionTotal = 282;
+  let KNOWN_Q_IDS = new Set();
+  async function api(path, body) {
+    const response = await fetch(path, {method:body === undefined ? "GET" : "POST",credentials:"same-origin",headers:body === undefined ? {} : {"Content-Type":"application/json"},body:body === undefined ? undefined : JSON.stringify(body),cache:"no-store"});
+    let data;
+    try { data = await response.json(); } catch { throw new Error("The app could not connect. Please try again."); }
+    if (!response.ok) throw new Error(data.error || "Please try again.");
+    return data;
+  }
+  async function loadAccess() {
+    const data = await api("/api/bootstrap");
+    Q = data.questions; QBY = Object.fromEntries(Q.map(q=>[q.id,q])); TOPIC_IDS = data.topicQuestionIds;
+    KNOWN_Q_IDS = new Set(Object.values(TOPIC_IDS).flat());
+    access = data.pass; checkoutAvailable = data.checkoutAvailable; testMode = data.testMode; questionTotal = data.totalQuestions;
+  }
+  function passGate(next) { if (access.active) return true; go(() => passScreen(next)); return false; }
+
 
   // Map positions come from real longitude/latitude, scaled onto a 1000x700 map.
   const STOPS = [
@@ -106,7 +123,7 @@
   }
   function stars(n) { return n >= LEG_LEN ? 3 : n >= STAR_2 ? 2 : n >= STAR_1 ? 1 : 0; }
   function starStr(s) { return "★".repeat(s) + "☆".repeat(3 - s); }
-  function unlocked(i) { return i === 0 || (P().best[STOPS[i - 1].id] || 0) >= 2; }
+  function unlocked(i) { return access.owner || i === 0 || (access.active && (P().best[STOPS[i - 1].id] || 0) >= 2); }
   function nextStopIndex() { for (let i = 0; i < STOPS.length; i++) if ((P().best[STOPS[i].id] || 0) < 2) return i; return -1; }
   function dueCards() {
     const t = today(), p = P();
@@ -149,7 +166,7 @@
 
   // Mastery: a question is "mastered" after 3 correct answers in a row.
   const MASTER_BOX = 3;
-  function topicIds(t) { return Q.filter((q) => q.t === t).map((q) => q.id); }
+  function topicIds(t) { return TOPIC_IDS[t] || []; }
   function mastery(ids) {
     const c = P().cards;
     return ids.length ? ids.filter((id) => c[id] && c[id].box >= MASTER_BOX).length / ids.length : 0;
@@ -157,7 +174,7 @@
   function readiness() {
     const p = P(), hist = p.permitHist || [];
     const cleared = STOPS.every((s) => (p.best[s.id] || 0) >= 2);
-    const m = mastery(Q.map((q) => q.id));
+    const m = mastery([...KNOWN_Q_IDS]);
     const topicReady = STOPS.every(s => mastery(topicIds(s.topic)) >= 0.8);
     const lastTwo = hist.length >= 2 && hist.slice(-2).every((x) => x >= READY_SCORE);
     return { cleared, m, topicReady, lastTwo, ready: cleared && topicReady && lastTwo };
@@ -301,6 +318,7 @@
         </div>
       </div>
 
+      <p class="pass-status">${testMode ? "Test environment · no real payments · " : ""}Level 1 is free. Full Island Pass: <b>$9.99 total</b>, one time.</p>
       <section class="garage">
         <h2>${ps.length ? "Who's driving?" : "Ready to roll?"}</h2>
         <div class="profiles">
@@ -337,7 +355,7 @@
       </section>
 
       <div class="footer">
-        <p>Free, no ads, no accounts. Progress saves only on this device (use a save code to back it up). Use a nickname, not your real name.</p>
+        <p>First level free. No ads. Learning progress stays on this device; use a save code to back it up. Paid access uses a private browser session and recovery code. Checkout is handled by Stripe. Use a nickname, not your real name.</p>
         <p>Questions are based on the official Hawaii Driver's Manual (Hawaii DOT). This is a study aid, not the official test. Always check the current manual and your county driver licensing office.</p>
         <p>Made with aloha in Honolulu for the local tech and AI community. <a href="https://github.com/lani-byte/oahu-road-trip" target="_blank" rel="noopener">Open source on GitHub</a>.</p>
       </div>`;
@@ -398,11 +416,13 @@
         <span class="chip">XP <b>${p.xp}</b></span>
         <span class="chip streak">Streak <b>${p.streak}</b> day${p.streak === 1 ? "" : "s"}</span>
         <span class="spacer"></span>
+        <button class="chip pass-chip" id="pass-account">${access.active ? (access.owner ? "Owner pass" : "Full Island Pass") : "Level 1 free"}</button>
         <button class="chip" id="snd" aria-pressed="${p.sound}">Sound ${p.sound ? "on" : "off"}</button>
       </div>
       <div class="xpbar" title="Progress to next level"><i style="width:${lv.pct}%"></i></div>`;
   }
   function wireHud() {
+    app.querySelector("#pass-account").onclick = () => go(() => passScreen());
     app.querySelector("#garage").onclick = () => go(garage);
     app.querySelector("#snd").onclick = () => { P().sound = !P().sound; save(); go(map); };
   }
@@ -433,7 +453,7 @@
         const left = s.side === "l", below = s.side === "b";
         const lx = below ? s.x : left ? s.x - 18 : s.x + 18, anchor = below ? "middle" : left ? "end" : "start";
         const ly = below ? s.y + 34 : s.y - 6, sy = below ? s.y + 50 : s.y + 13;
-        return `<g class="stop ${lock ? "locked" : ""} ${i === nx ? "next" : ""}" data-i="${i}" tabindex="${lock ? -1 : 0}" role="button" aria-label="Stop ${i + 1}: ${esc(s.name)}, ${esc(s.title)}${lock ? ", locked" : ""}">
+        return `<g class="stop ${lock ? "locked" : ""} ${i === nx ? "next" : ""}" data-i="${i}" tabindex="${lock && !(i > 0 && !access.active) ? -1 : 0}" role="button" aria-label="Stop ${i + 1}: ${esc(s.name)}, ${esc(s.title)}${i > 0 && !access.active ? ", Full Island Pass" : lock ? ", earn 2 stars at the previous stop" : ""}">
           <circle class="ring" cx="${s.x}" cy="${s.y}" r="18"/>
           <circle class="stop-dot" cx="${s.x}" cy="${s.y}" r="13" fill="${fill}"/>
           <text class="label" x="${lx}" y="${ly}" text-anchor="${anchor}">${esc(s.name)}</text>
@@ -455,15 +475,17 @@
     const cleared = STOPS.filter((s) => (p.best[s.id] || 0) >= 2).length;
     app.innerHTML = `
       ${hud()}
+      ${testMode ? `<p class="pass-status">Test environment: checkout uses test payments only.</p>` : ""}
       <section class="card next-drive">
         <div class="kicker">${cleared ? "Your next adventure" : "Start here · Stop 1 of 12"}</div>
         <h1>${nx >= 0 ? esc(STOPS[nx].name) + ": " + esc(STOPS[nx].title) : "You’ve travelled the island!"}</h1>
         <p>Learn a road tip. Try it with help. Then earn stars in a 10-question challenge.</p>
-        <button class="btn primary big" id="m-next">${nx >= 0 ? (cleared ? "Continue learning" : "Start learning in Kapolei") : "Revisit your first stop"}</button>
+        <button class="btn primary big" id="m-next">${nx > 0 && !access.active ? "Unlock the full island · $9.99" : nx >= 0 ? (cleared ? "Continue learning" : "Start learning in Kapolei") : "Revisit your first stop"}</button>
         <p class="small muted">No timer on the learning route. Mistakes are part of the trip.</p>
       </section>
       <div class="map-wrap">${mapSVG()}</div>
-      <p class="small muted center">${cleared}/${STOPS.length} stops cleared · Select an unlocked stop to learn or replay.</p>
+      <p class="small muted center">${cleared}/${STOPS.length} stops cleared · ${access.active ? "Earn stars to open the next stop." : "Kapolei is free. A Full Island Pass opens the remaining route and tools."}</p>
+      ${!access.active ? `<section class="card pass-teaser"><h2>Keep your road trip going</h2><p>11 more stops, practice games and your Permit Day challenge.</p><button class="btn primary" id="m-pass">See Full Island Pass · $9.99 once</button><button class="btn ghost" id="m-restore-pass">Already have a pass?</button></section>` : ""}
       <details class="menu-group"><summary>Practice & quick games <span>Flashcards, signs, daily review and speed rounds</span></summary><div class="modes">
         <button class="mode pit" id="m-pit"><h3>Pit Stop</h3><p>Start here each day: review what you missed or are due to see again.</p><span class="pill">${due ? due + " due now" : "Nothing due"}</span></button>
         <button class="mode" id="m-flash"><h3>Flashcards</h3><p>Think of the answer first, then flip. Pick any topic, even locked ones.</p><span class="pill">Self-check</span></button>
@@ -479,8 +501,8 @@
       <div class="stop-list">
         ${STOPS.map((s, i) => {
           const st = p.best[s.id] || 0, lock = !unlocked(i), m = Math.round(mastery(topicIds(s.topic)) * 100);
-          return `<button class="stop-row ${st >= 2 ? "done" : ""} ${i === nx ? "next" : ""}" data-i="${i}" ${lock ? "disabled" : ""}>
-            <span class="num">${i + 1}</span><span><span class="title">${esc(s.name)}</span><br><span class="sub">${esc(s.title)}${lock ? " · locked" : ` · ${m}% mastered`}</span></span>
+          return `<button class="stop-row ${st >= 2 ? "done" : ""} ${i === nx ? "next" : ""}" data-i="${i}" ${lock && !(i > 0 && !access.active) ? "disabled" : ""}>
+            <span class="num">${i + 1}</span><span><span class="title">${esc(s.name)}</span><br><span class="sub">${esc(s.title)}${i > 0 && !access.active ? " · Full Island Pass" : lock ? " · earn 2 stars at the previous stop" : ` · ${m}% mastered`}</span></span>
             <span class="st">${st ? starStr(st) : s.boss ? "BOSS" : ""}</span></button>`;
         }).join("")}
       </div>
@@ -489,9 +511,11 @@
       ${readyCard()}
       <div class="row" style="margin-top:22px"><button class="btn ghost" id="m-badges">Badges (${p.badges.length}/${BADGES.length})</button><button class="btn ghost" id="m-save">Save code backup</button><span class="spacer"></span><button class="linkish" id="m-del">Delete this driver</button></div>
       </details>
-      <div class="footer"><p>Based on the official Hawaii Driver's Manual (Hawaii DOT). Study aid only. Page numbers in each explanation point to the manual so you can read more.</p></div>`;
+      <div class="footer"><p>Based on the <a href="${MANUAL_URL}" target="_blank" rel="noopener">official Hawaii Driver’s Manual</a>. Study aid only. The manual remains free to read. Learning progress stays on this device; purchase access uses a secure browser cookie and a private recovery code.</p></div>`;
     wireHud();
-    const openStop = (i) => { if (unlocked(i)) go(() => startLeg(i)); else toast("Clear the stop before it with 2 stars first"); };
+    const passButton=app.querySelector("#m-pass"); if(passButton) passButton.onclick=()=>go(()=>passScreen());
+    const restoreButton=app.querySelector("#m-restore-pass"); if(restoreButton) restoreButton.onclick=()=>go(()=>restorePass());
+    const openStop = (i) => { if (i > 0 && !access.active) return go(()=>passScreen(()=>startLeg(i))); if (unlocked(i)) go(() => startLeg(i)); else toast("Clear the stop before it with 2 stars first"); };
     app.querySelectorAll(".map .stop[data-i]").forEach((g) => {
       g.onclick = () => openStop(+g.dataset.i);
       g.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openStop(+g.dataset.i); } };
@@ -524,7 +548,7 @@
   const b64d = (s) => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return decodeURIComponent(escape(atob(s))); };
 
   function makeCode(p) {
-    const cards = Object.entries(p.cards).filter(([id]) => QBY[id]).map(([id, c]) => [id, c.box, c.due, c.r, c.w]);
+    const cards = Object.entries(p.cards).filter(([id]) => KNOWN_Q_IDS.has(id)).map(([id, c]) => [id, c.box, c.due, c.r, c.w]);
     const data = { v: 1, n: p.name, c: p.color, x: p.xp, s: p.streak, l: p.lastDay, b: p.best, k: cards, g: p.badges,
       o: p.otBest, pb: p.permitBest, pt: p.permitTries, ph: p.permitHist || [], pi: p.pits, a: p.answered, r: p.right, sp: p.spotted || [] };
     return CODE_PREFIX + b64e(JSON.stringify(data));
@@ -543,7 +567,7 @@
     if (d.b && typeof d.b === "object") for (const [k, v] of Object.entries(d.b)) if (stopIds.has(k)) best[k] = int(v, 0, 3, 0);
     const cards = {};
     if (Array.isArray(d.k)) for (const row of d.k) {
-      if (!Array.isArray(row) || !QBY[row[0]]) continue;
+      if (!Array.isArray(row) || !KNOWN_Q_IDS.has(row[0])) continue;
       cards[row[0]] = { box: int(row[1], 0, BOXES.length - 1, 0), due: int(row[2], 0, 1e6, today()), r: int(row[3], 0, 1e6, 0), w: int(row[4], 0, 1e6, 0) };
     }
     const name = String(d.n || "Driver").slice(0, 16).trim() || "Driver";
@@ -633,7 +657,7 @@
         <div class="stat-grid">
           <div class="stat"><b>${p.answered}</b><span>answered</span></div>
           <div class="stat"><b>${p.answered ? Math.round((p.right / p.answered) * 100) : 0}%</b><span>accuracy</span></div>
-          <div class="stat"><b>${Object.keys(p.cards).length}/${Q.length}</b><span>questions seen</span></div>
+          <div class="stat"><b>${Object.keys(p.cards).length}/${questionTotal}</b><span>questions seen</span></div>
         </div>
         <button class="btn primary" id="back">Back to the map</button>
       </div>`;
@@ -645,11 +669,14 @@
   // Sessions: leg (stop), pit (review), ot (timed), permit (mock test)
   // ------------------------------------------------------------------
   function begin(mode, ids, extra) {
+    if ((mode !== "leg" || extra?.stop > 0) && !passGate(()=>begin(mode,ids,extra))) return;
     session = Object.assign({ mode, queue: ids, i: 0, results: [], combo: 0, bestCombo: 0, xp: 0, detour: [], inDetour: false }, extra || {});
     touchStreak(); save();
     ask();
   }
   function startLeg(i) {
+    if (i > 0 && !passGate(()=>startLeg(i))) return;
+    if (!unlocked(i)) { toast("Earn 2 stars at the previous stop first."); return go(map); }
     const s = STOPS[i];
     const ids = pickFrom(Q.filter((q) => q.t === s.topic).map((q) => q.id), LEG_LEN);
     go(() => roadLesson(i, ids, 0));
@@ -684,6 +711,7 @@
     };
   }
   function startPit() {
+    if (!passGate(startPit)) return;
     let ids = dueCards().slice(0, 15), label = "Pit Stop";
     if (!ids.length) {
       const seen = Object.keys(P().cards);
@@ -698,11 +726,13 @@
     return new Set(t);
   }
   function startOT() {
+    if (!passGate(startOT)) return;
     const topics = unlockedTopics();
     const ids = shuffle(Q.filter((q) => topics.has(q.t)).map((q) => q.id));
     begin("ot", ids, { score: 0, end: Date.now() + OT_SECONDS * 1000, missed: [] });
   }
   function startPermit() {
+    if (!passGate(startPermit)) return;
     let ids = [];
     STOPS.forEach((s) => { ids = ids.concat(shuffle(Q.filter((q) => q.t === s.topic).map((q) => q.id)).slice(0, 3)); });
     ids = shuffle(ids).slice(0, PERMIT_LEN);
@@ -710,6 +740,7 @@
   }
 
   function startSprint() {
+    if (!passGate(startSprint)) return;
     const pool = Q.filter((q) => q.t === "symbols" || q.sign).map((q) => q.id);
     begin("sprint", shuffle(pickFrom(pool, SPRINT_LEN)));
   }
@@ -732,6 +763,7 @@
 
   // Flashcards: retrieval practice with self-check. Think first, then flip.
   function flashPick() {
+    if (!passGate(flashPick)) return;
     app.innerHTML = `${hud()}
       <div class="card stack" style="margin-top:14px">
         <h2>Flashcards</h2>
@@ -798,6 +830,7 @@
   ];
   const SPOT = ["octagon", "triangle", "speed", "donotenter", "oneway", "noturn", "nouturn", "noparking", "keepright", "leftonly", "accessible", "curve", "turn", "winding", "crossroad", "sideroad", "tee", "merge", "laneends", "addedlane", "divided", "dividedends", "twoway", "hill", "slippery", "pedestrian", "bicycle", "signal", "stopahead", "school", "rrahead", "workers", "flagger", "hospital", "interstate", "recreation", "guide"];
   function coach() {
+    if (!passGate(coach)) return;
     const p = P(); p.spotted = p.spotted || [];
     app.innerHTML = `${hud()}
       <div class="card stack" style="margin-top:14px">
@@ -967,10 +1000,10 @@
           <div class="small muted">${esc(st.name)}: ${esc(st.title)}</div>
           <h2>${cleared ? (got === 3 ? "Perfect drive!" : "Stop cleared!") : "Almost there"}</h2>
           <div class="big-stars" aria-label="${got} of 3 stars">${"★".repeat(got)}<span class="off">${"★".repeat(3 - got)}</span></div>
-          <p class="muted">${cleared ? (nextI < STOPS.length && prev < 2 ? `Road to <b>${esc(STOPS[nextI].name)}</b> is open.` : "Nice work.") : `You need ${STAR_2} of ${LEG_LEN} to clear this stop. Try again, the questions you missed come back first.`}</p>
+          <p class="muted">${cleared ? (nextI < STOPS.length && prev < 2 ? `${access.active ? `Road to <b>${esc(STOPS[nextI].name)}</b> is open.` : `Your free stop is complete! Keep going with a Full Island Pass.`}` : "Nice work.") : `You need ${STAR_2} of ${LEG_LEN} to clear this stop. Try again, the questions you missed come back first.`}</p>
         </div>
         <div class="stat-grid"><div class="stat"><b>${right}/${LEG_LEN}</b><span>first try</span></div><div class="stat"><b>+${s.xp}</b><span>XP${bonus ? " + bonus" : ""}</span></div><div class="stat"><b>x${s.bestCombo}</b><span>best combo</span></div></div>
-        <div class="row"><button class="btn primary big" id="again">${cleared ? "Replay for 3 stars" : "Try again"}</button>${cleared && nextI < STOPS.length ? `<button class="btn go big" id="next">Drive to ${esc(STOPS[nextI].name)}</button>` : ""}<button class="btn ghost" id="map">Map</button></div>`;
+        <div class="row"><button class="btn primary big" id="again">${cleared ? "Replay for 3 stars" : "Try again"}</button>${cleared && nextI < STOPS.length ? `<button class="btn go big" id="next">${access.active ? `Drive to ${esc(STOPS[nextI].name)}` : "Unlock Full Island Pass · $9.99"}</button>` : ""}<button class="btn ghost" id="map">Map</button></div>`;
       save();
       app.innerHTML = `<div class="card">${body}</div>`;
       app.querySelector("#again").onclick = () => go(() => startLeg(s.stop));
@@ -1017,8 +1050,55 @@
   }
 
   // ------------------------------------------------------------------
-  // Boot
-  // ------------------------------------------------------------------
-  if (store.active && store.profiles[store.active]) go(map);
-  else go(Object.keys(store.profiles).length ? garage : garage);
+  function passBack() { go(P() ? map : garage); }
+  function passScreen(next) {
+    if (access.active) {
+      app.innerHTML = `<section class="card stack island-pass"><div class="kicker">${access.owner ? "Complimentary owner access" : "Your pass is active"}</div><h1>Full Island Pass</h1><p>You have access to every stop and all practice tools. Earn stars to advance along the learning route${access.owner ? ", or select any stop with your owner pass" : ""}.</p><p>Learning progress is separate from your pass. Back up your progress with a save code before changing devices.</p><button class="btn primary" id="recovery-code">${access.hasRecoveryCode ? "Replace my recovery code" : "Save my recovery code"}</button><button class="btn ghost" id="pass-continue">Back to my road trip</button><details><summary>Sign out on this browser</summary><p>Your progress stays on this device. You’ll need your recovery code to restore paid access.</p><button class="btn ghost" id="pass-signout">Sign out of my pass</button></details></section>`;
+      app.querySelector("#recovery-code").onclick=()=>go(recoveryScreen);
+      app.querySelector("#pass-continue").onclick=next ? ()=>go(next) : passBack;
+      app.querySelector("#pass-signout").onclick=async()=>{ if(!confirm("Have you saved your recovery code? Signing out keeps progress, but you’ll need the code to restore full access."))return; try{await api("/api/logout",{});await loadAccess();passBack();}catch(e){toast(e.message);} };
+      return;
+    }
+    app.innerHTML = `<section class="card stack island-pass"><button class="btn ghost" id="pass-back">Back to the free level</button><div class="kicker">Your next adventure</div><h1>Unlock the full island</h1><p class="pass-price">$9.99 <span>one time</span></p><p>No subscription. Keep learning at your pace.</p><ul class="pass-benefits"><li>All 12 island stops, including the free Kapolei level</li><li>Flashcards, Sign Sprint and Overtime</li><li>Pit Stop review, Permit Day and Coach Corner</li><li>A private recovery code to restore your pass on another device</li></ul><p>Your free level, explanations and progress stay available if you choose not to buy.</p>${testMode ? `<p class="pass-status">Sandbox checkout: test payments only. No real charge.</p>` : ""}<button class="btn primary big" id="pass-buy" ${checkoutAvailable ? "" : "disabled"}>${checkoutAvailable ? "Continue to secure checkout" : "Checkout is being set up"}</button><p class="small muted">Payment is handled by Stripe. Your total is $9.99.</p><button class="btn ghost" id="restore-pass">Already have a pass? Restore with a code</button><a href="${MANUAL_URL}" target="_blank" rel="noopener">Read the official manual free</a><p id="pass-error" role="alert"></p></section>`;
+    app.querySelector("#pass-back").onclick=passBack;
+    app.querySelector("#restore-pass").onclick=()=>go(()=>restorePass(next));
+    app.querySelector("#pass-buy").onclick=async()=>{
+      const b=app.querySelector("#pass-buy");b.disabled=true;b.textContent="Opening checkout…";
+      try {const data=await api("/api/checkout",{});if(data.alreadyUnlocked){await loadAccess();return go(()=>passScreen(next));}const target=new URL(data.url);if(target.protocol!=="https:"||target.hostname!=="checkout.stripe.com")throw new Error("Checkout could not be opened.");window.location.assign(target.href);}
+      catch(e){app.querySelector("#pass-error").textContent=e.message;b.disabled=false;b.textContent="Try secure checkout again";}
+    };
+  }
+  function restorePass(next) {
+    app.innerHTML=`<section class="card stack island-pass"><h1>Restore Full Island Pass</h1><p>Enter the private recovery code you saved after purchasing, or the complimentary pass code you received. A website link or learning-progress save code won’t unlock a pass.</p><form id="restore-form"><label for="pass-code">Full Island Pass recovery code</label><input class="field" id="pass-code" autocomplete="off" spellcheck="false" placeholder="OAHU-…" maxlength="80" required><button class="btn primary" type="submit" id="restore-submit">Restore my pass</button></form><p id="restore-error" role="alert"></p><button class="btn ghost" id="restore-back">Back</button></section>`;
+    app.querySelector("#restore-back").onclick=()=>go(()=>passScreen(next));
+    app.querySelector("#restore-form").onsubmit=async e=>{e.preventDefault();const b=app.querySelector("#restore-submit");b.disabled=true;try{await api("/api/recovery/restore",{code:app.querySelector("#pass-code").value});await loadAccess();go(()=>passScreen(next));}catch(error){app.querySelector("#restore-error").textContent=error.message;b.disabled=false;}};
+  }
+  function recoveryScreen() {
+    app.innerHTML=`<section class="card stack island-pass"><h1>Keep a spare key to your island</h1><p>Your recovery code restores paid access, but it does not transfer your learning progress. Use a separate save code to back up progress.</p><p>${access.hasRecoveryCode ? "Generating a new code will invalidate your previous recovery code. Browsers already signed in stay signed in." : "Save this code somewhere private. Anyone who has it can restore your pass."}</p><button class="btn primary" id="issue-code">${access.hasRecoveryCode ? "Generate replacement code" : "Generate my recovery code"}</button><div id="code-result" aria-live="polite"></div><button class="btn ghost" id="code-back">Back to my pass</button></section>`;
+    app.querySelector("#code-back").onclick=()=>go(()=>passScreen());
+    app.querySelector("#issue-code").onclick=async()=>{const b=app.querySelector("#issue-code");b.disabled=true;try{const data=await api("/api/recovery/issue",{});access.hasRecoveryCode=true;app.querySelector("#code-result").innerHTML=`<label for="new-pass-code">Your private recovery code</label><textarea id="new-pass-code" class="field" readonly></textarea><p>Save it now. We don’t store a readable copy of this code.</p><button class="btn primary" id="download-pass">Download my recovery code</button>`;app.querySelector("#new-pass-code").value=data.code;app.querySelector("#download-pass").onclick=()=>{const blob=new Blob(["Oʻahu Road Trip Full Island Pass\n\n"+data.code+"\n\nKeep this code private. It restores access, not learning progress.\n"],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="oahu-full-island-pass.txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};b.textContent="Recovery code generated";}catch(e){app.querySelector("#code-result").textContent=e.message;b.disabled=false;}};
+  }
+  async function purchaseStatus() {
+    app.innerHTML=`<section class="card stack island-pass"><h1>Checking your Full Island Pass</h1><p>We’re waiting for payment confirmation. This page does not unlock access by itself.</p><p id="purchase-message" aria-live="polite"></p><button class="btn primary" id="check-payment">Check payment status</button><button class="btn ghost" id="purchase-back">Back to the free level</button></section>`;
+    app.querySelector("#purchase-back").onclick=passBack;
+    const check=async()=>{const b=app.querySelector("#check-payment");b.disabled=true;try{await loadAccess();if(access.active){history.replaceState(null,"",window.location.pathname);app.innerHTML=`<section class="card stack island-pass"><div class="kicker">Payment confirmed</div><h1>Your island is unlocked!</h1><p>Save your private recovery code so you can restore access on another device.</p><button class="btn primary big" id="purchase-code">Save my recovery code</button><button class="btn ghost" id="purchase-continue">Continue my road trip</button></section>`;app.querySelector("#purchase-code").onclick=()=>go(recoveryScreen);app.querySelector("#purchase-continue").onclick=passBack;return;}app.querySelector("#purchase-message").textContent="Payment isn’t confirmed yet. If you paid, wait a moment and check again. Please don’t pay twice.";}catch(e){app.querySelector("#purchase-message").textContent=e.message;}b.disabled=false;};
+    app.querySelector("#check-payment").onclick=check;
+    await check();
+  }
+
+  // Boot: question content and paid access come from the server, never a URL or local save.
+  async function boot() {
+    app.innerHTML = `<div class="card stack"><h1>Getting your road trip ready…</h1><p>Checking your access. Your learning progress stays on this device.</p></div>`;
+    try {
+      await loadAccess();
+      const result = new URLSearchParams(window.location.search).get("purchase");
+      if (result === "complete") return go(purchaseStatus);
+      if (result === "cancelled") toast("Checkout cancelled. Your free level is still here.");
+      if (store.active && store.profiles[store.active]) go(map); else go(garage);
+    } catch {
+      app.innerHTML = `<div class="card stack"><h1>Let’s try that again</h1><p>We couldn’t connect to the game. Your saved progress has not been changed.</p><button class="btn primary" id="reload">Try again</button></div>`;
+      app.querySelector("#reload").onclick = boot;
+    }
+  }
+  boot();
 })();

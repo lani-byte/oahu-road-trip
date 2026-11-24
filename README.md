@@ -1,6 +1,6 @@
 # Oʻahu Road Trip
 
-A free browser game for studying the **Hawaii instruction permit (learner's permit) written test**. Drive a lap around Oʻahu, clear each stop, and finish at Permit Day.
+A browser game with a free first level for studying the **Hawaii instruction permit (learner's permit) written test**. Drive a lap around Oʻahu, clear each stop, and finish at Permit Day.
 
 Made in Honolulu as a Christmas 2026 gift to the local tech and AI community.
 
@@ -31,7 +31,10 @@ Made in Honolulu as a Christmas 2026 gift to the local tech and AI community.
 
 ## Privacy
 
-- No accounts, no server, no analytics, no cookies.
+- Learning profiles stay on the device. Paid access uses a server-side grant and an HttpOnly browser cookie. No analytics.
+- First level free; Full Island Pass is $9.99 once, with no tax added at checkout. Stripe handles payment details.
+- A private recovery code restores paid access on another device. Only its hash is stored. Anyone with the code can restore the pass. It does not transfer learning progress.
+- Generating a replacement recovery code invalidates the old code, but does not sign out other browsers. Losing both the code and browser session requires manual purchase verification.
 - Several players can share one device. Each picks a nickname and car color. Progress is saved only in that browser's `localStorage` and never leaves the device.
 - Clearing browser data erases progress. **Save code backup** (on the map screen) turns a driver's progress into a text code or file. Restore it on the "Who's driving?" screen, on the same device or a new one. The code is validated field by field when it's restored.
 - On iPhone, Safari may clear saved data for sites not opened in about a week. Adding the game to the Home Screen helps, and a save code covers the rest.
@@ -54,10 +57,17 @@ Found an error? Open an issue with the question ID (for example `s4`) and the ma
 
 ## Run it
 
-It's a static site: plain HTML, CSS and JavaScript, no build step.
+The interface uses plain HTML, CSS and JavaScript. A Cloudflare Pages worker verifies paid access and serves question content; a static file server alone is no longer sufficient.
 
-- **Locally:** serve this folder with any static server, for example `python3 -m http.server 8787`, then open http://localhost:8787. Opening `index.html` directly may block saving progress in some browsers.
-- **Cloudflare Pages:** connect this repo in Workers & Pages. Framework preset: none. Build command: none. Build output directory: `/`.
+- **Locally:** run `npm ci`, `npm run build`, then `npm run dev`. Initialize the local D1 database with `migrations/0001_passes.sql` before testing restored access. Without paid configuration, the free level remains available and checkout stays disabled.
+- **Cloudflare Pages:** build command `npm run build`, output directory `/`. Use a separate D1 database and Stripe credentials for Preview and Production. Bind D1 as `DB`; apply the migration before enabling checkout.
+- Required variables: `APP_ORIGIN` (exact HTTPS origin), `STRIPE_MODE` (`test` or `live`), `TAX_MODE=none`, `STRIPE_PRICE_ID` (USD 999, one-time, exclusive tax behavior).
+- Encrypted secrets: `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `RATE_LIMIT_SALT`. Never commit them. Use a restricted Stripe key with Checkout Sessions write, Prices read, Payment Intents read and Charges read.
+- Configure Stripe webhook URL `<APP_ORIGIN>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, and `charge.dispute.created`. The webhook signature and retrieved paid session are verified before granting access. Full refunds revoke the paid grant; disputes suspend it pending manual review. Partial refunds do not revoke access automatically.
+- Owner or complimentary access: `node scripts/create-complimentary.mjs --owner` prepares private SQL and a recovery-code file outside this repository. Apply the SQL only to the intended database, and keep the code private. It does not activate or send a pass by itself.
+- `npm test` checks server access gates, recovery, replay/refund handling and preservation of saved progress. A real sandbox checkout and restore on another browser are required before production activation.
+
+The public MIT repository and earlier deployments still contain reusable source. The paywall controls access to this hosted service, not copies of already published code. Existing deployment URLs must be addressed separately if they should no longer serve the earlier free version.
 
 ## Files
 

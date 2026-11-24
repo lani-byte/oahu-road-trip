@@ -1,0 +1,10 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS identities (id TEXT PRIMARY KEY, recovery_hash TEXT UNIQUE, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, identity_id TEXT NOT NULL REFERENCES identities(id), expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS sessions_identity ON sessions(identity_id);
+CREATE TABLE IF NOT EXISTS checkout_attempts (id TEXT PRIMARY KEY, identity_id TEXT NOT NULL REFERENCES identities(id), created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS orders (session_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL REFERENCES identities(id), payment_intent TEXT UNIQUE NOT NULL, amount_total INTEGER NOT NULL, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS grants (source_id TEXT PRIMARY KEY, identity_id TEXT NOT NULL REFERENCES identities(id), kind TEXT NOT NULL CHECK(kind IN ('paid','complimentary','owner')), status TEXT NOT NULL CHECK(status IN ('active','revoked','disputed')), created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS grants_identity ON grants(identity_id, status);
+CREATE TABLE IF NOT EXISTS payment_blocks (payment_intent TEXT PRIMARY KEY, status TEXT NOT NULL CHECK(status IN ('revoked','disputed')), updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
