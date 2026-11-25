@@ -1,4 +1,4 @@
-/* Oʻahu Road Trip: a Hawaii permit study game.
+/* Road Ready: Oʻahu: a Hawaii permit study game.
    Plain JavaScript with server-verified Full Island Pass access. Progress lives in this
    browser's localStorage, per player profile. No names leave the device. */
 (function () {
@@ -288,8 +288,8 @@
       <div class="home-hero">
         ${heroScene()}
         <div class="hero-text">
-          <span class="badge-pill">Hawaii learner's permit study game</span>
-          <h1 class="title-pop"><span class="t1">Oʻahu</span> <span class="t2">Road Trip</span></h1>
+          <span class="badge-pill">Hawaiʻi permit practice game</span>
+          <h1 class="title-pop"><span class="t1">Road Ready:</span> <span class="t2">Oʻahu</span></h1>
           <p class="hero-sub">Learn the rules. Try them out. <b>Earn your way around Oʻahu.</b></p>
         </div>
       </div>
@@ -424,7 +424,7 @@
       <polyline class="route-dash" points="${pts.join(" ")}"/>
       ${doneUpTo > 0 ? `<polyline class="route-done" points="${donePts.join(" ")}"/>` : ""}
       <text class="label" x="110" y="110" style="font-family:var(--display);font-size:34px;fill:var(--line)">OʻAHU</text>
-      <text class="label" x="110" y="138" style="font-size:14px;fill:#bfe9f2">Road Trip</text>
+      <text class="label" x="110" y="138" style="font-size:14px;fill:#bfe9f2">Road Ready</text>
       ${STOPS.map((s, i) => {
         const st = p.best[s.id] || 0, lock = !unlocked(i);
         const fill = st >= 2 ? "var(--go)" : s.boss ? "var(--coral)" : "var(--line)";
@@ -535,7 +535,7 @@
   // Strictly rebuild a profile from untrusted text: only known fields, right types, sane ranges.
   function readCode(text) {
     const raw = String(text || "").replace(/\s+/g, "");
-    if (!raw.startsWith(CODE_PREFIX)) throw new Error("That doesn't look like an Oʻahu Road Trip save code.");
+    if (!raw.startsWith(CODE_PREFIX)) throw new Error("That doesn't look like an Road Ready: Oʻahu save code.");
     let d;
     try { d = JSON.parse(b64d(raw.slice(CODE_PREFIX.length))); } catch (e) { throw new Error("That save code is incomplete or damaged. Copy the whole thing and try again."); }
     if (!d || d.v !== 1) throw new Error("This save code is from a different version.");
@@ -591,7 +591,7 @@
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
     const sh = app.querySelector("#share");
-    if (sh) sh.onclick = () => navigator.share({ title: "Oʻahu Road Trip save code", text: code }).catch(() => {});
+    if (sh) sh.onclick = () => navigator.share({ title: "Road Ready: Oʻahu save code", text: code }).catch(() => {});
     app.querySelector("#back").onclick = () => go(map);
   }
 
@@ -1072,7 +1072,7 @@
   function recoveryScreen() {
     app.innerHTML=`<section class="card stack island-pass"><h1>Keep a spare key to your island</h1><p>Your recovery code restores paid access, but it does not transfer your learning progress. Use a separate save code to back up progress.</p><p>${access.hasRecoveryCode ? "Generating a new code will invalidate your previous recovery code. Browsers already signed in stay signed in." : "Save this code somewhere private. Anyone who has it can restore your pass."}</p><button class="btn primary" id="issue-code">${access.hasRecoveryCode ? "Generate replacement code" : "Generate my recovery code"}</button><div id="code-result" aria-live="polite"></div><button class="btn ghost" id="code-back">Back to my pass</button></section>`;
     app.querySelector("#code-back").onclick=()=>go(()=>passScreen());
-    app.querySelector("#issue-code").onclick=async()=>{const b=app.querySelector("#issue-code");b.disabled=true;try{const data=await api("/api/recovery/issue",{});access.hasRecoveryCode=true;app.querySelector("#code-result").innerHTML=`<label for="new-pass-code">Your private recovery code</label><textarea id="new-pass-code" class="field" readonly></textarea><p>Save it now. We don’t store a readable copy of this code.</p><button class="btn primary" id="download-pass">Download my recovery code</button>`;app.querySelector("#new-pass-code").value=data.code;app.querySelector("#download-pass").onclick=()=>{const blob=new Blob(["Oʻahu Road Trip Full Island Pass\n\n"+data.code+"\n\nKeep this code private. It restores access, not learning progress.\n"],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="oahu-full-island-pass.txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};b.textContent="Recovery code generated";}catch(e){app.querySelector("#code-result").textContent=e.message;b.disabled=false;}};
+    app.querySelector("#issue-code").onclick=async()=>{const b=app.querySelector("#issue-code");b.disabled=true;try{const data=await api("/api/recovery/issue",{});access.hasRecoveryCode=true;app.querySelector("#code-result").innerHTML=`<label for="new-pass-code">Your private recovery code</label><textarea id="new-pass-code" class="field" readonly></textarea><p>Save it now. We don’t store a readable copy of this code.</p><button class="btn primary" id="download-pass">Download my recovery code</button>`;app.querySelector("#new-pass-code").value=data.code;app.querySelector("#download-pass").onclick=()=>{const blob=new Blob(["Road Ready: Oʻahu Full Island Pass\n\n"+data.code+"\n\nKeep this code private. It restores access, not learning progress.\n"],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="oahu-full-island-pass.txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};b.textContent="Recovery code generated";}catch(e){app.querySelector("#code-result").textContent=e.message;b.disabled=false;}};
   }
   async function purchaseStatus() {
     app.innerHTML=`<section class="card stack island-pass"><h1>Checking your Full Island Pass</h1><p>We’re waiting for payment confirmation. This page does not unlock access by itself.</p><p id="purchase-message" aria-live="polite"></p><button class="btn primary" id="check-payment">Check payment status</button><button class="btn ghost" id="purchase-back">Back to the free level</button></section>`;

@@ -1,4 +1,4 @@
-# Oʻahu Road Trip
+# Road Ready: Oʻahu
 
 A browser game with a free first level for studying the **Hawaii instruction permit (learner's permit) written test**. Drive a lap around Oʻahu, clear each stop, and finish at Permit Day.
 
