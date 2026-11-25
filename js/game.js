@@ -251,7 +251,7 @@
   // Home (garage): animated island scene, drivers, what's inside, sign teaser
   // ------------------------------------------------------------------
   function heroScene() {
-    return `<img class="hero-art" src="assets/oahu-arcade-hero-v1.svg" width="1200" height="600" alt="Arcade game illustration of a coral car, island mountains and a turquoise coastline" fetchpriority="high" decoding="async">`;
+    return `<img class="hero-art" src="assets/oahu-arcade-hero-v2.svg" width="1200" height="600" alt="Arcade game illustration of a coral car, island mountains and a turquoise coastline" fetchpriority="high" decoding="async">`;
   }
 
   function teaser() {
@@ -316,7 +316,7 @@
         </div>
       </section>
 
-      <section class="card learning-intro"><h2>Your road trip starts here</h2><p>Pick a nickname and a car. We’ll teach you before we test you.</p><ol class="journey-steps"><li><b>Learn</b><span>Short road tips, one at a time</span></li><li><b>Try it</b><span>Practice with help, no lost stars</span></li><li><b>Earn stars</b><span>Take the challenge and unlock your next stop</span></li></ol></section>
+      <section class="card learning-intro"><h2>Your road trip starts here</h2><p>Pick a nickname and a car. We’ll teach you before we test you.</p><ol class="journey-steps"><li><b>Learn</b><span>Your road tips on one easy page</span></li><li><b>Practice</b><span>Optional help before your challenge</span></li><li><b>Earn stars</b><span>Take the challenge and unlock your next stop</span></li></ol></section>
 
       <section>
         <details class="menu-group"><summary>Explore the game modes</summary>
@@ -457,7 +457,7 @@
       <section class="card next-drive">
         <div class="kicker">${cleared ? "Your next adventure" : "Start here · Stop 1 of 12"}</div>
         <h1>${nx >= 0 ? esc(STOPS[nx].name) + ": " + esc(STOPS[nx].title) : "You’ve travelled the island!"}</h1>
-        <p>Learn a road tip. Try it with help. Then earn stars in a 10-question challenge.</p>
+        <p>Read your roadside briefing. Then earn stars in a 10-question challenge.</p>
         <button class="btn primary big" id="m-next">${nx > 0 && !access.active ? "Unlock the full island · $9.99" : nx >= 0 ? (cleared ? "Continue learning" : "Start learning in Kapolei") : "Revisit your first stop"}</button>
         <p class="small muted">No timer on the learning route. Mistakes are part of the trip.</p>
       </section>
@@ -657,8 +657,26 @@
     if (!unlocked(i)) { toast("Earn 2 stars at the previous stop first."); return go(map); }
     const s = STOPS[i];
     const ids = pickFrom(Q.filter((q) => q.t === s.topic).map((q) => q.id), LEG_LEN);
-    go(() => roadLesson(i, ids, 0));
+    go(() => roadBriefing(i, ids));
   }
+  // One page of study material for the exact questions in the next challenge.
+  // Reading or practicing never awards mastery, XP, or stars.
+  function roadBriefing(stop, ids) {
+    const s = STOPS[stop];
+    const tips = ids.map(id => QBY[id]);
+    app.innerHTML = `<section class="briefing-page">
+      <nav class="drive-top briefing-nav"><button class="btn ghost" id="briefing-map">Back to map</button><span class="briefing-level">Stop ${stop + 1} of ${STOPS.length} · ${esc(s.name)}</span></nav>
+      <header class="briefing-header"><span class="briefing-tag">Roadside briefing</span><h1>${esc(s.title)}</h1><p>Your next mission: ${esc(s.blurb)} Read these ${tips.length} tips, then put them into play.</p><div class="briefing-route" aria-label="Briefing, then challenge, then stars"><span class="active">1. Briefing</span><span>2. Challenge</span><span>3. Stars</span></div></header>
+      <ol class="briefing-tips">${tips.map((q,i) => `<li class="briefing-tip" data-tip="${esc(q.id)}"><span class="briefing-number" aria-hidden="true">${String(i+1).padStart(2,"0")}</span><div>${q.sign ? signSVG(q.sign) : ""}${q.cs ? `<div class="briefing-sign">${signImg(q.c[0])}<span>${esc(label(q,q.c[0]))}</span></div>` : ""}<h2>${esc(q.q)}</h2><p>${esc(q.why)}</p></div></li>`).join("")}</ol>
+      <footer class="card briefing-ready"><h2>Ready for your challenge?</h2><p>${tips.length} questions, no timer. Earn ${STAR_2} correct answers for 2 stars and the next stop. Misses get another practice lap.</p><div class="row"><button class="btn primary big" id="briefing-challenge">Start the ${tips.length}-question challenge</button><button class="btn ghost" id="briefing-practice">Practice with help first</button><button class="btn ghost" id="briefing-print">Print briefing</button></div></footer>
+      <details class="briefing-sources"><summary>Study sources</summary><p>This briefing is a game study aid. Check the current official guidance before driving or testing.</p><ol>${tips.map(q=>`<li>${sourceHTML(q)}</li>`).join("")}</ol></details>
+    </section>`;
+    app.querySelector("#briefing-map").onclick = () => go(map);
+    app.querySelector("#briefing-challenge").onclick = () => begin("leg", shuffle(ids.slice()), {stop});
+    app.querySelector("#briefing-practice").onclick = () => go(() => roadLesson(stop, ids, 0));
+    app.querySelector("#briefing-print").onclick = () => window.print();
+  }
+
   // Learning does not grade cards, award mastery, or alter challenge scores.
   function roadLesson(stop, ids, at) {
     const s = STOPS[stop];

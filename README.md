@@ -8,6 +8,7 @@ Made in Honolulu as a Christmas 2026 gift to the local tech and AI community.
 
 - **12 stops around the island**, each covering one topic: Permit Basics (Kapolei), Lanes & Lines (Pearl City), Signals (Downtown), Right of Way (Waikīkī), Shapes & Colors (Hawaiʻi Kai), the **Sign Showdown** boss level with signs that have no words (Makapuʻu), Speed & Space (Waimānalo), Passing & Parking (Kailua), H-3 & Weather (Kāneʻohe), Share the Road (Lāʻie), Emergency Moves (Haleʻiwa) and Safe Choices (Wahiawā).
 - **282 questions**, including 58 sign questions using 44 official US road signs (most of them symbol-only, like the real test shows). Some ask "what does this sign mean?" and others ask you to pick the right sign from four pictures.
+- **Roadside briefing:** each stop starts with one readable study sheet covering the ten questions in the next challenge, with optional practice and a print view. Reading and practice do not award mastery or stars.
 - **10 questions per stop.** Get 8 right (80%, the game progression threshold) to earn 2 stars and unlock the next stop. 10/10 earns 3 stars.
 - **Detour:** questions you miss come back at the end of the stop for another try.
 - **Pit Stop:** a spaced-review round. Missed questions return the next day, and questions you keep getting right show up less often (after 1, 2, 4, 7 and 14 days).
