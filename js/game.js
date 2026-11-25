@@ -335,6 +335,7 @@
         </div>
         <div class="row" style="margin-top:14px">
           <button class="btn primary big start-btn" id="new">${ps.length ? "+ New driver" : "Start learning"}</button>
+          <button class="btn ghost big" id="home-pass">${access.active ? "My Full Island Pass" : "Full Island Pass · $9.99"}</button>
           <button class="btn ghost" id="restore">Restore from save code</button>
         </div>
       </section>
@@ -357,11 +358,12 @@
       <div class="footer">
         <p>First level free. No ads. Learning progress stays on this device; use a save code to back it up. Paid access uses a private browser session and recovery code. Checkout is handled by Stripe. Use a nickname, not your real name.</p>
         <p>Questions are based on the official Hawaii Driver's Manual (Hawaii DOT). This is a study aid, not the official test. Always check the current manual and your county driver licensing office.</p>
-        <p>Made with aloha in Honolulu for the local tech and AI community. <a href="https://github.com/lani-byte/oahu-road-trip" target="_blank" rel="noopener">Open source on GitHub</a>.</p>
+        <p>Made with aloha in Honolulu for the local tech and AI community.</p>
       </div>`;
     app.querySelectorAll(".garage-card").forEach((b) => b.onclick = () => { store.active = b.dataset.id; save(); go(map); });
     app.querySelector("#new").onclick = () => go(createProfile);
     app.querySelector("#restore").onclick = () => go(restoreScreen);
+    app.querySelector("#home-pass").onclick = () => go(() => passScreen());
 
   }
 
