@@ -34,6 +34,7 @@ Made in Honolulu as a Christmas 2026 gift to the local tech and AI community.
 
 - Learning profiles stay on the device. Paid access uses a server-side grant and an HttpOnly browser cookie. No analytics.
 - First level free; Full Island Pass is $9.99 once, with no tax added at checkout. Stripe handles payment details.
+- One Full Island Pass is for one household with up to three active browser/device sessions, each supporting multiple local driver profiles. Manage devices from My Full Island Pass; at the limit, a valid recovery code lets you replace an old device. Browser data resets count as a new device. Sessions expire after 30 days; signing out frees a slot. Device descriptions are coarse browser/platform labels, not hardware identifiers.
 - A private recovery code restores paid access on another device. Only its hash is stored. Anyone with the code can restore the pass. It does not transfer learning progress.
 - Generating a replacement recovery code invalidates the old code, but does not sign out other browsers. Losing both the code and browser session requires manual purchase verification.
 - Several players can share one device. Each picks a nickname and car color. Progress is saved only in that browser's `localStorage` and never leaves the device.
@@ -60,8 +61,8 @@ Found an error? Open an issue with the question ID (for example `s4`) and the ma
 
 The interface uses plain HTML, CSS and JavaScript. A Cloudflare Pages worker verifies paid access and serves question content; a static file server alone is no longer sufficient.
 
-- **Locally:** run `npm ci`, `npm run build`, then `npm run dev`. Initialize the local D1 database with `migrations/0001_passes.sql` before testing restored access. Without paid configuration, the free level remains available and checkout stays disabled.
-- **Cloudflare Pages:** build command `npm run build`, output directory `/`. Use a separate D1 database and Stripe credentials for Preview and Production. Bind D1 as `DB`; apply the migration before enabling checkout.
+- **Locally:** run `npm ci`, `npm run build`, then `npm run dev`. Initialize the local D1 database with `migrations/0001_passes.sql` and then `migrations/0002_household_devices.sql` before testing restored access. Without paid configuration, the free level remains available and checkout stays disabled.
+- **Cloudflare Pages:** build command `npm run build`, output directory `/`. Use a separate D1 database and Stripe credentials for Preview and Production. Bind D1 as `DB`; apply both migrations in numeric order before deploying the household-device update. The second migration is additive and backfills existing sessions without signing them out.
 - Required variables: `APP_ORIGIN` (exact HTTPS origin), `STRIPE_MODE` (`test` or `live`), `TAX_MODE=none`, `STRIPE_PRICE_ID` (USD 999, one-time, exclusive tax behavior).
 - Encrypted secrets: `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `RATE_LIMIT_SALT`. Never commit them. Use a restricted Stripe key with Checkout Sessions write, Prices read, Payment Intents read and Charges read.
 - Configure Stripe webhook URL `<APP_ORIGIN>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`, and `charge.dispute.created`. The webhook signature and retrieved paid session are verified before granting access. Full refunds revoke the paid grant; disputes suspend it pending manual review. Partial refunds do not revoke access automatically.

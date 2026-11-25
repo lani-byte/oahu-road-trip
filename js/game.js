@@ -16,7 +16,7 @@
     const response = await fetch(path, {method:body === undefined ? "GET" : "POST",credentials:"same-origin",headers:body === undefined ? {} : {"Content-Type":"application/json"},body:body === undefined ? undefined : JSON.stringify(body),cache:"no-store"});
     let data;
     try { data = await response.json(); } catch { throw new Error("The app could not connect. Please try again."); }
-    if (!response.ok) throw new Error(data.error || "Please try again.");
+    if (!response.ok) { const error = new Error(data.error || "Please try again."); error.data = data; throw error; }
     return data;
   }
   async function loadAccess() {
@@ -294,7 +294,7 @@
         </div>
       </div>
 
-      <p class="pass-status">${testMode ? "Test environment · no real payments · " : ""}Level 1 is free. Full Island Pass: <b>$9.99 total</b>, one time.</p>
+      <p class="pass-status">${testMode ? "Test environment · no real payments · " : ""}Level 1 is free. Full Island Pass: <b>$9.99 total</b>, one time. One household, up to 3 devices.</p>
       <section class="garage">
         <h2>${ps.length ? "Who's driving?" : "Ready to roll?"}</h2>
         <div class="profiles">
@@ -462,7 +462,7 @@
         <p class="small muted">No timer on the learning route. Mistakes are part of the trip.</p>
       </section>
       <div class="map-wrap">${mapSVG()}</div>
-      <p class="small muted center">${cleared}/${STOPS.length} stops cleared · ${access.active ? "Earn stars to open the next stop." : "Kapolei is free. A Full Island Pass opens the remaining route and tools."}</p>
+      <div class="map-caption small muted center"><p class="map-progress">${cleared}/${STOPS.length} stops cleared</p><p>${access.active ? "Earn stars to open the next stop." : "Kapolei is free. A Full Island Pass opens the remaining route and tools."}</p></div>
       ${!access.active ? `<section class="card pass-teaser"><h2>Keep your road trip going</h2><p>11 more stops, practice games and your Permit Day challenge.</p><button class="btn primary" id="m-pass">See Full Island Pass · $9.99 once</button><button class="btn ghost" id="m-restore-pass">Already have a pass?</button></section>` : ""}
       <details class="menu-group"><summary>Practice & quick games <span>Flashcards, signs, daily review and speed rounds</span></summary><div class="modes">
         <button class="mode pit" id="m-pit"><h3>Pit Stop</h3><p>Start here each day: review what you missed or are due to see again.</p><span class="pill">${due ? due + " due now" : "Nothing due"}</span></button>
@@ -1049,13 +1049,14 @@
   function passBack() { go(P() ? map : garage); }
   function passScreen(next) {
     if (access.active) {
-      app.innerHTML = `<section class="card stack island-pass"><div class="kicker">${access.owner ? "Complimentary owner access" : "Your pass is active"}</div><h1>Full Island Pass</h1><p>You have access to every stop and all practice tools. Earn stars to advance along the learning route${access.owner ? ", or select any stop with your owner pass" : ""}.</p><p>Learning progress is separate from your pass. Back up your progress with a save code before changing devices.</p><button class="btn primary" id="recovery-code">${access.hasRecoveryCode ? "Replace my recovery code" : "Save my recovery code"}</button><button class="btn ghost" id="pass-continue">Back to my road trip</button><details><summary>Sign out on this browser</summary><p>Your progress stays on this device. You’ll need your recovery code to restore paid access.</p><button class="btn ghost" id="pass-signout">Sign out of my pass</button></details></section>`;
+      app.innerHTML = `<section class="card stack island-pass"><div class="kicker">${access.owner ? "Complimentary owner access" : "Your pass is active"}</div><h1>Full Island Pass</h1><p>You have access to every stop and all practice tools. Earn stars to advance along the learning route${access.owner ? ", or select any stop with your owner pass" : ""}.</p><p>One household, up to 3 active devices. Each browser counts as a device, with multiple driver profiles. Learning progress is separate from your pass. Back it up with a save code before changing devices.</p><button class="btn ghost" id="pass-devices">Manage my devices</button><button class="btn primary" id="recovery-code">${access.hasRecoveryCode ? "Replace my recovery code" : "Save my recovery code"}</button><button class="btn ghost" id="pass-continue">Back to my road trip</button><details><summary>Sign out on this browser</summary><p>Your progress stays on this device. You’ll need your recovery code to restore paid access.</p><button class="btn ghost" id="pass-signout">Sign out of my pass</button></details></section>`;
       app.querySelector("#recovery-code").onclick=()=>go(recoveryScreen);
+      app.querySelector("#pass-devices").onclick=()=>go(devicesScreen);
       app.querySelector("#pass-continue").onclick=next ? ()=>go(next) : passBack;
       app.querySelector("#pass-signout").onclick=async()=>{ if(!confirm("Have you saved your recovery code? Signing out keeps progress, but you’ll need the code to restore full access."))return; try{await api("/api/logout",{});await loadAccess();passBack();}catch(e){toast(e.message);} };
       return;
     }
-    app.innerHTML = `<section class="card stack island-pass"><button class="btn ghost" id="pass-back">Back to the free level</button><div class="kicker">Your next adventure</div><h1>Unlock the full island</h1><p class="pass-price">$9.99 <span>one time</span></p><p>No subscription. Keep learning at your pace.</p><ul class="pass-benefits"><li>All 12 island stops, including the free Kapolei level</li><li>Flashcards, Sign Sprint and Overtime</li><li>Pit Stop review, Permit Day and Coach Corner</li><li>A private recovery code to restore your pass on another device</li></ul><p>Your free level, explanations and progress stay available if you choose not to buy.</p>${testMode ? `<p class="pass-status">Sandbox checkout: test payments only. No real charge.</p>` : ""}<button class="btn primary big" id="pass-buy" ${checkoutAvailable ? "" : "disabled"}>${checkoutAvailable ? "Continue to secure checkout" : "Checkout is being set up"}</button><p class="small muted">Payment is handled by Stripe. Your total is $9.99.</p><button class="btn ghost" id="restore-pass">Already have a pass? Restore with a code</button><a href="${MANUAL_URL}" target="_blank" rel="noopener">Read the official manual free</a><p id="pass-error" role="alert"></p></section>`;
+    app.innerHTML = `<section class="card stack island-pass"><button class="btn ghost" id="pass-back">Back to the free level</button><div class="kicker">Your next adventure</div><h1>Unlock the full island</h1><p class="pass-price">$9.99 <span>one time</span></p><p>No subscription. One household, up to 3 active devices. Each browser counts as a device. Add multiple driver profiles on each.</p><ul class="pass-benefits"><li>All 12 island stops, including the free Kapolei level</li><li>Flashcards, Sign Sprint and Overtime</li><li>Pit Stop review, Permit Day and Coach Corner</li><li>A private recovery code and device controls when you switch devices</li></ul><p>Your free level, explanations and progress stay available if you choose not to buy.</p>${testMode ? `<p class="pass-status">Sandbox checkout: test payments only. No real charge.</p>` : ""}<button class="btn primary big" id="pass-buy" ${checkoutAvailable ? "" : "disabled"}>${checkoutAvailable ? "Continue to secure checkout" : "Checkout is being set up"}</button><p class="small muted">Payment is handled by Stripe. Your total is $9.99.</p><button class="btn ghost" id="restore-pass">Already have a pass? Restore with a code</button><a href="${MANUAL_URL}" target="_blank" rel="noopener">Read the official manual free</a><p id="pass-error" role="alert"></p></section>`;
     app.querySelector("#pass-back").onclick=passBack;
     app.querySelector("#restore-pass").onclick=()=>go(()=>restorePass(next));
     app.querySelector("#pass-buy").onclick=async()=>{
@@ -1065,12 +1066,42 @@
     };
   }
   function restorePass(next) {
-    app.innerHTML=`<section class="card stack island-pass"><h1>Restore Full Island Pass</h1><p>Enter the private recovery code you saved after purchasing, or the complimentary pass code you received. A website link or learning-progress save code won’t unlock a pass.</p><form id="restore-form"><label for="pass-code">Full Island Pass recovery code</label><input class="field" id="pass-code" autocomplete="off" spellcheck="false" placeholder="OAHU-…" maxlength="80" required><button class="btn primary" type="submit" id="restore-submit">Restore my pass</button></form><p id="restore-error" role="alert"></p><button class="btn ghost" id="restore-back">Back</button></section>`;
+    app.innerHTML=`<section class="card stack island-pass"><h1>Restore Full Island Pass</h1><p>Enter the private recovery code you saved after purchasing, or the complimentary pass code you received. A website link or learning-progress save code won’t unlock a pass.</p><form id="restore-form"><label for="pass-code">Full Island Pass recovery code</label><input class="field" id="pass-code" autocomplete="off" spellcheck="false" placeholder="OAHU-…" maxlength="80" required><button class="btn primary" type="submit" id="restore-submit">Restore my pass</button></form><p id="restore-error" role="alert"></p><div id="restore-devices" class="stack"></div><button class="btn ghost" id="restore-back">Back</button></section>`;
     app.querySelector("#restore-back").onclick=()=>go(()=>passScreen(next));
-    app.querySelector("#restore-form").onsubmit=async e=>{e.preventDefault();const b=app.querySelector("#restore-submit");b.disabled=true;try{await api("/api/recovery/restore",{code:app.querySelector("#pass-code").value});await loadAccess();go(()=>passScreen(next));}catch(error){app.querySelector("#restore-error").textContent=error.message;b.disabled=false;}};
+    const restore = async (replaceDeviceId) => {
+      const b=app.querySelector("#restore-submit");b.disabled=true;
+      app.querySelectorAll("[data-replace-device]").forEach(button=>button.disabled=true);
+      try {
+        await api("/api/recovery/restore",{code:app.querySelector("#pass-code").value,...(replaceDeviceId?{replaceDeviceId}:{})});
+        await loadAccess();go(()=>passScreen(next));
+      } catch(error) {
+        app.querySelector("#restore-error").textContent=error.message;b.disabled=false;
+        const box=app.querySelector("#restore-devices");box.innerHTML="";
+        if(error.data?.code==="device_limit") {
+          box.innerHTML=`<h2>Choose a device to replace</h2><p>Its pass will be signed out. Its saved learning progress stays on that device.</p>${error.data.devices.map(d=>`<button class="btn ghost" data-replace-device="${esc(d.id)}">Replace ${esc(d.label)} · ${esc(new Date(d.lastUsedAt*1000).toLocaleString())}</button>`).join("")}`;
+          box.querySelectorAll("[data-replace-device]").forEach(button=>button.onclick=()=>{if(confirm("Replace this device? Its pass will be signed out. Its learning progress stays saved."))restore(button.dataset.replaceDevice);});
+        }
+      }
+    };
+    app.querySelector("#restore-form").onsubmit=e=>{e.preventDefault();restore();};
+  }
+  async function devicesScreen() {
+    app.innerHTML=`<section class="card stack island-pass"><h1>Your household devices</h1><p>Up to 3 active devices. Each browser counts separately; driver profiles within a browser share its slot. Removing a device signs out its pass, but keeps its saved learning progress.</p><div id="device-list" class="stack" aria-live="polite">Loading devices…</div><p id="device-error" role="alert"></p><button class="btn ghost" id="device-back">Back to my pass</button></section>`;
+    app.querySelector("#device-back").onclick=()=>go(()=>passScreen());
+    try {
+      const data=await api("/api/devices");
+      const list=app.querySelector("#device-list");if(!list)return;
+      list.innerHTML=`<p>${data.devices.length} of ${data.deviceLimit} device slots in use</p>${data.devices.map(d=>`<div class="card"><p><b>${esc(d.label)}</b>${d.current?" · This browser":""}</p><p class="small muted">Last used ${esc(new Date(d.lastUsedAt*1000).toLocaleString())}</p>${d.current?"":`<button class="btn ghost" data-remove-device="${esc(d.id)}">Remove this device</button>`}</div>`).join("")}`;
+      list.querySelectorAll("[data-remove-device]").forEach(button=>button.onclick=async()=>{
+        if(!confirm("Sign out this device from your pass? Its learning progress stays saved."))return;
+        button.disabled=true;
+        try{await api("/api/devices/remove",{deviceId:button.dataset.removeDevice});go(devicesScreen);}
+        catch(error){app.querySelector("#device-error").textContent=error.message;button.disabled=false;}
+      });
+    } catch(error) {const box=app.querySelector("#device-error");if(box)box.textContent=error.message;}
   }
   function recoveryScreen() {
-    app.innerHTML=`<section class="card stack island-pass"><h1>Keep a spare key to your island</h1><p>Your recovery code restores paid access, but it does not transfer your learning progress. Use a separate save code to back up progress.</p><p>${access.hasRecoveryCode ? "Generating a new code will invalidate your previous recovery code. Browsers already signed in stay signed in." : "Save this code somewhere private. Anyone who has it can restore your pass."}</p><button class="btn primary" id="issue-code">${access.hasRecoveryCode ? "Generate replacement code" : "Generate my recovery code"}</button><div id="code-result" aria-live="polite"></div><button class="btn ghost" id="code-back">Back to my pass</button></section>`;
+    app.innerHTML=`<section class="card stack island-pass"><h1>Keep a spare key to your island</h1><p>Your recovery code restores paid access, but it does not transfer your learning progress. Use a separate save code to back up progress.</p><p>${access.hasRecoveryCode ? "Generating a new code will invalidate your previous recovery code. Browsers already signed in stay signed in. Use Manage my devices to sign out an old or shared browser." : "Save this code somewhere private. Anyone who has it can restore your pass."}</p><button class="btn primary" id="issue-code">${access.hasRecoveryCode ? "Generate replacement code" : "Generate my recovery code"}</button><div id="code-result" aria-live="polite"></div><button class="btn ghost" id="code-back">Back to my pass</button></section>`;
     app.querySelector("#code-back").onclick=()=>go(()=>passScreen());
     app.querySelector("#issue-code").onclick=async()=>{const b=app.querySelector("#issue-code");b.disabled=true;try{const data=await api("/api/recovery/issue",{});access.hasRecoveryCode=true;app.querySelector("#code-result").innerHTML=`<label for="new-pass-code">Your private recovery code</label><textarea id="new-pass-code" class="field" readonly></textarea><p>Save it now. We don’t store a readable copy of this code.</p><button class="btn primary" id="download-pass">Download my recovery code</button>`;app.querySelector("#new-pass-code").value=data.code;app.querySelector("#download-pass").onclick=()=>{const blob=new Blob(["Road Ready: Oʻahu Full Island Pass\n\n"+data.code+"\n\nKeep this code private. It restores access, not learning progress.\n"],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="oahu-full-island-pass.txt";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};b.textContent="Recovery code generated";}catch(e){app.querySelector("#code-result").textContent=e.message;b.disabled=false;}};
   }
@@ -1083,6 +1114,20 @@
   }
 
   // Boot: question content and paid access come from the server, never a URL or local save.
+  let checkingPass = false, lastPassCheck = 0;
+  async function refreshPassSession() {
+    if (!access.active || document.hidden || checkingPass || Date.now()-lastPassCheck<1000) return;
+    checkingPass=true;lastPassCheck=Date.now();
+    try {
+      await loadAccess();
+      if (!access.active) { go(()=>passScreen());toast("This browser has been signed out of the pass. Your learning progress is still saved."); }
+    } catch { /* A temporary network problem must not erase progress or sign out a valid pass. */ }
+    finally {checkingPass=false;}
+  }
+  window.addEventListener("focus",refreshPassSession);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshPassSession();});
+  setInterval(refreshPassSession,60000);
+
   async function boot() {
     app.innerHTML = `<div class="card stack"><h1>Getting your road trip ready…</h1><p>Checking your access. Your learning progress stays on this device.</p></div>`;
     try {

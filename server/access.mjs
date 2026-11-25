@@ -21,14 +21,36 @@ export function cookieName(env) { return /^http:\/\/(localhost|127\.0\.0\.1)(:\d
 export function sessionCookie(env, token, maxAge = 2592000) {
   return `${cookieName(env)}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${cookieName(env).startsWith('__Host-') ? '; Secure' : ''}`;
 }
+export const DEVICE_LIMIT = 3;
+export function deviceLabel(request) {
+  const ua = request.headers.get('User-Agent') || '';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\/|FxiOS\//.test(ua) ? 'Firefox' : /Chrome\/|CriOS\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const system = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Macintosh|Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'device';
+  return `${browser} on ${system}`;
+}
 export async function getIdentity(request, env) {
   const token = (request.headers.get('Cookie') || '').split(';').map(s => s.trim()).find(s => s.startsWith(cookieName(env) + '='))?.split('=')[1];
   if (!/^[a-f0-9]{64}$/.test(token || '')) return null;
-  return env.DB.prepare('SELECT i.id, i.recovery_hash FROM identities i JOIN sessions s ON s.identity_id=i.id WHERE s.token_hash=? AND s.expires_at>?').bind(await hash(token), now()).first();
+  const tokenHash = await hash(token);
+  const identity = await env.DB.prepare('SELECT i.id, i.recovery_hash, d.id AS device_id FROM identities i JOIN sessions s ON s.identity_id=i.id LEFT JOIN devices d ON d.token_hash=s.token_hash WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash, now()).first();
+  if (identity?.device_id) await env.DB.prepare('UPDATE devices SET last_used_at=? WHERE id=?').bind(now(), identity.device_id).run();
+  return identity;
 }
-export async function createSession(identityId, env) {
-  const token = opaque();
-  await env.DB.prepare('INSERT INTO sessions(token_hash,identity_id,expires_at,created_at) VALUES(?,?,?,?)').bind(await hash(token), identityId, now() + 2592000, now()).run();
+export async function listDevices(identityId, env, currentId = null) {
+  const rows = await env.DB.prepare('SELECT d.id,d.label,d.created_at,d.last_used_at FROM devices d JOIN sessions s ON s.token_hash=d.token_hash WHERE d.identity_id=? AND s.expires_at>? ORDER BY d.created_at,d.id').bind(identityId,now()).all();
+  return rows.results.map(d => ({id:d.id,label:d.label,createdAt:d.created_at,lastUsedAt:d.last_used_at,current:d.id===currentId}));
+}
+export async function createSession(identityId, env, label = 'Browser', replaceDeviceId = null) {
+  const token = opaque(), tokenHash = await hash(token), stamp = now();
+  const statements = [env.DB.prepare('DELETE FROM sessions WHERE identity_id=? AND expires_at<=?').bind(identityId,stamp)];
+  if (replaceDeviceId) statements.push(env.DB.prepare('DELETE FROM sessions WHERE identity_id=? AND token_hash=(SELECT token_hash FROM devices WHERE id=? AND identity_id=?)').bind(identityId,replaceDeviceId,identityId));
+  // D1 executes this batch as one transaction. The conditional insert enforces the
+  // cap even when two browsers restore simultaneously. No bearer/hash is exposed.
+  statements.push(env.DB.prepare('INSERT INTO sessions(token_hash,identity_id,expires_at,created_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM sessions WHERE identity_id=? AND expires_at>?)<?').bind(tokenHash,identityId,stamp+2592000,stamp,identityId,stamp,DEVICE_LIMIT));
+  statements.push(env.DB.prepare('INSERT INTO devices(id,identity_id,token_hash,label,created_at,last_used_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(crypto.randomUUID(),identityId,tokenHash,label,stamp,stamp,tokenHash));
+  await env.DB.batch(statements);
+  const inserted = await env.DB.prepare('SELECT token_hash FROM sessions WHERE token_hash=?').bind(tokenHash).first();
+  if (!inserted) return null;
   return sessionCookie(env, token);
 }
 export async function ensureIdentity(request, env) {
@@ -36,7 +58,7 @@ export async function ensureIdentity(request, env) {
   if (existing) return { identity: existing, cookie: null };
   const identity = {id: crypto.randomUUID(), recovery_hash: null};
   await env.DB.prepare('INSERT INTO identities(id,created_at) VALUES(?,?)').bind(identity.id, now()).run();
-  return { identity, cookie: await createSession(identity.id, env) };
+  return { identity, cookie: await createSession(identity.id, env, deviceLabel(request)) };
 }
 export async function entitlement(identity, env) {
   if (!identity) return {active: false, owner: false};

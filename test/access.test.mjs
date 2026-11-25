@@ -6,8 +6,9 @@ import {createApp} from '../server/app.mjs';
 import {createSession, recoveryCode, normalizeCode, hash, now} from '../server/access.mjs';
 import {checkoutOptions, checkoutReady, fulfill, handlePaymentEvent} from '../server/payments.mjs';
 function setup() {
- const db=new DatabaseSync(':memory:'); db.exec(readFileSync(new URL('../migrations/0001_passes.sql',import.meta.url),'utf8'));
- const DB={prepare(sql){let values=[];return {bind(...v){values=v;return this},async first(){return db.prepare(sql).get(...values)||null},async run(){return db.prepare(sql).run(...values)}}},async batch(stmts){db.exec('BEGIN');try {const rows=[];for(const s of stmts) rows.push(await s.run());db.exec('COMMIT');return rows}catch(e){db.exec('ROLLBACK');throw e}}};
+ const db=new DatabaseSync(':memory:'); db.exec(readFileSync(new URL('../migrations/0001_passes.sql',import.meta.url),'utf8')); db.exec(readFileSync(new URL('../migrations/0002_household_devices.sql',import.meta.url),'utf8'));
+ let batchTail=Promise.resolve();
+ const DB={prepare(sql){let values=[];return {bind(...v){values=v;return this},async first(){return db.prepare(sql).get(...values)||null},async all(){return {results:db.prepare(sql).all(...values)}},async run(){return db.prepare(sql).run(...values)}}},async batch(stmts){const run=batchTail.then(async()=>{db.exec('BEGIN');try {const rows=[];for(const s of stmts) rows.push(await s.run());db.exec('COMMIT');return rows}catch(e){db.exec('ROLLBACK');throw e}});batchTail=run.catch(()=>{});return run}};
  const env={DB,APP_ORIGIN:'https://app.example',RATE_LIMIT_SALT:'test-only-salt',STRIPE_MODE:'test',TAX_MODE:'none',STRIPE_PRICE_ID:'price_test',STRIPE_API_KEY:'test-placeholder',STRIPE_WEBHOOK_SECRET:'test-placeholder',ASSETS:{fetch:async()=>new Response('asset')}};
  const questions=[{id:'free',t:'basics',q:'free lesson'},{id:'paid',t:'lines',q:'premium lesson'}];
  const app=createApp({questions,makeStripe:()=>({}),verifyEvent:async()=>{throw Error('bad signature')}});
@@ -46,4 +47,69 @@ test('checkout binds validated test price to a private browser session',async()=
  const app=createApp({questions:[],makeStripe:()=>({prices:{retrieve:async()=>({active:true,type:'one_time',unit_amount:999,currency:'usd',tax_behavior:'exclusive',livemode:false})},checkout:{sessions:{create:async o=>{options=o;return {id:'cs_created',url:'https://checkout.stripe.com/c/pay/test'}}}}}),verifyEvent:async()=>{}});
  const response=await app.fetch(new Request(env.APP_ORIGIN+'/api/checkout',{method:'POST',headers:{Origin:env.APP_ORIGIN},body:'{}'}),env);
  assert.equal(response.status,200);assert.match(response.headers.get('Set-Cookie'),/HttpOnly/);assert.equal(db.prepare('SELECT identity_id FROM checkout_attempts').get().identity_id,options.client_reference_id);assert.equal(options.line_items[0].price,'price_test');assert.equal(options.automatic_tax,undefined);
+});
+
+async function household() {
+ const x=setup();const first=await x.identity();x.grant(first.id);
+ const code=(await(await x.req('/api/recovery/issue','POST',first.cookie)).json()).code;
+ return {...x,...first,code};
+}
+test('three household browsers share a pass, fourth is blocked without leaking tokens',async()=>{
+ const {req,db,cookie,code}=await household();
+ for(let n=0;n<2;n++)assert.equal((await req('/api/recovery/restore','POST','',{code})).status,200);
+ const blocked=await req('/api/recovery/restore','POST','',{code});assert.equal(blocked.status,409);assert.equal(blocked.headers.get('Set-Cookie'),null);
+ const data=await blocked.json();assert.equal(data.code,'device_limit');assert.equal(data.devices.length,3);
+ assert.equal(data.deviceLimit,3);assert.ok(data.devices.every(d=>d.id&&!('token_hash' in d)&&!('identity_id' in d)));
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n,3);
+ // Restoring again in the current browser reuses its existing slot.
+ assert.equal((await req('/api/recovery/restore','POST',cookie,{code})).status,200);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n,3);
+});
+test('valid recovery code can replace a chosen full-slot device and signs it out',async()=>{
+ const {req,cookie,code,db}=await household();
+ for(let n=0;n<2;n++)await req('/api/recovery/restore','POST','',{code});
+ const before=await(await req('/api/devices','GET',cookie)).json();const old=before.devices.find(d=>d.current);
+ const replaced=await req('/api/recovery/restore','POST','',{code,replaceDeviceId:old.id});assert.equal(replaced.status,200);
+ const fresh=replaced.headers.get('Set-Cookie').split(';')[0];
+ assert.equal((await(await req('/api/bootstrap','GET',cookie)).json()).pass.active,false);
+ assert.equal((await(await req('/api/bootstrap','GET',fresh)).json()).pass.active,true);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n,3);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM devices').get().n,3);
+});
+test('device management is pass scoped, protects current browser and frees removed slots',async()=>{
+ const {req,cookie,code,db}=await household();
+ const second=(await req('/api/recovery/restore','POST','',{code})).headers.get('Set-Cookie').split(';')[0];
+ const devices=(await(await req('/api/devices','GET',cookie)).json()).devices;
+ const other=devices.find(d=>!d.current),current=devices.find(d=>d.current);
+ assert.equal((await req('/api/devices')).status,403);
+ assert.equal((await req('/api/devices/remove','POST',cookie,{deviceId:current.id})).status,400);
+ const stranger=await req('/api/recovery/restore','POST','',{code:recoveryCode(),replaceDeviceId:other.id});assert.equal(stranger.status,400);
+ assert.equal((await req('/api/devices/remove','POST',cookie,{deviceId:other.id})).status,200);
+ assert.equal((await(await req('/api/bootstrap','GET',second)).json()).pass.active,false);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM devices').get().n,1);
+ assert.equal((await req('/api/recovery/restore','POST','',{code})).status,200);
+});
+test('one pass cannot remove another household device or replace it with its code',async()=>{
+ const {req,cookie,code,identity,grant}=await household();const stranger=await identity();grant(stranger.id);
+ const strangerDevice=(await(await req('/api/devices','GET',stranger.cookie)).json()).devices[0].id;
+ assert.equal((await req('/api/devices/remove','POST',cookie,{deviceId:strangerDevice})).status,404);
+ assert.equal((await req('/api/recovery/restore','POST','',{code,replaceDeviceId:strangerDevice})).status,400);
+ assert.equal((await(await req('/api/bootstrap','GET',stranger.cookie)).json()).pass.active,true);
+});
+test('expired sessions free slots and concurrent session creation never exceeds three',async()=>{
+ const {env,db,id}=await household();
+ db.exec('UPDATE sessions SET expires_at=0');
+ const attempts=await Promise.all(Array.from({length:6},()=>createSession(id,env)));
+ assert.equal(attempts.filter(Boolean).length,3);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n,3);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM devices').get().n,3);
+});
+test('additive device migration backfills existing sessions without removing them',()=>{
+ const db=new DatabaseSync(':memory:');db.exec(readFileSync(new URL('../migrations/0001_passes.sql',import.meta.url),'utf8'));
+ db.prepare('INSERT INTO identities(id,created_at) VALUES(?,?)').run('existing',now());
+ db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run('a'.repeat(64),'existing',now()+1000,now());
+ const migration=readFileSync(new URL('../migrations/0002_household_devices.sql',import.meta.url),'utf8');db.exec(migration);db.exec(migration);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n,1);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM devices').get().n,1);
+ assert.equal(db.prepare('SELECT label FROM devices').get().label,'Existing browser');db.close();
 });

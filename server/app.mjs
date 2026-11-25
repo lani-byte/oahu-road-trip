@@ -1,4 +1,4 @@
-import {now, opaque, hash, recoveryCode, normalizeCode, cookieName, sessionCookie, getIdentity, createSession, ensureIdentity, entitlement, rateLimit, sameOrigin, json, smallJSON} from './access.mjs';
+import {now, opaque, hash, recoveryCode, normalizeCode, cookieName, sessionCookie, getIdentity, createSession, DEVICE_LIMIT, deviceLabel, listDevices, ensureIdentity, entitlement, rateLimit, sameOrigin, json, smallJSON} from './access.mjs';
 import {checkoutOptions, checkoutReady, handlePaymentEvent} from './payments.mjs';
 const FREE_TOPIC = 'basics';
 const ALLOWED_ASSET = /^(?:\/|\/index\.html|\/css\/style\.css|\/js\/(?:game|signs)\.js|\/signs\/[A-Za-z0-9_-]+\.svg|\/assets\/(?:oahu-arcade-hero-v2\.svg|oahu-racing-hero-v3\.png)|\/favicon\.ico|\/robots\.txt)$/;
@@ -56,7 +56,30 @@ export function createApp({questions, makeStripe, verifyEvent}) {
           if (!normalized) return json({error:'That code was not recognized. Check your saved Full Island Pass code.'},400);
           const identity = await env.DB.prepare('SELECT id,recovery_hash FROM identities WHERE recovery_hash=?').bind(await hash(normalized)).first();
           if (!(await entitlement(identity,env)).active) return json({error:'That code was not recognized or its pass is no longer active.'},400);
-          return json({restored:true},200,{'Set-Cookie':await createSession(identity.id,env)});
+          const current = await getIdentity(request,env);
+          if (current?.id === identity.id) return json({restored:true});
+          const devices = await listDevices(identity.id,env);
+          const replaceId = typeof body.replaceDeviceId === 'string' ? body.replaceDeviceId : null;
+          if (replaceId && !devices.some(d=>d.id===replaceId)) return json({error:'That device is no longer active. Please try restoring again.'},400);
+          const cookie = await createSession(identity.id,env,deviceLabel(request),replaceId);
+          if (!cookie) return json({error:'Your household pass is already on three browsers. Choose one to replace, or use a browser already signed in.',code:'device_limit',devices:await listDevices(identity.id,env),deviceLimit:DEVICE_LIMIT},409);
+          return json({restored:true},200,{'Set-Cookie':cookie});
+        }
+        if (path === '/api/devices' && request.method === 'GET') {
+          const identity = await getIdentity(request,env);
+          if (!(await entitlement(identity,env)).active) return json({error:'Restore your Full Island Pass first.'},403);
+          return json({devices:await listDevices(identity.id,env,identity.device_id),deviceLimit:DEVICE_LIMIT});
+        }
+        if (path === '/api/devices/remove' && request.method === 'POST') {
+          const identity = await getIdentity(request,env);
+          if (!(await entitlement(identity,env)).active) return json({error:'Restore your Full Island Pass first.'},403);
+          if (!await rateLimit(request,env,'devices',20,600)) return json({error:'Please wait before changing devices again.'},429);
+          const body = await smallJSON(request);
+          if (body.deviceId === identity.device_id) return json({error:'Use Sign out on this browser to remove this device.'},400);
+          const devices = await listDevices(identity.id,env,identity.device_id);
+          if (!devices.some(d=>d.id===body.deviceId)) return json({error:'That device is no longer active.'},404);
+          await env.DB.prepare('DELETE FROM sessions WHERE identity_id=? AND token_hash=(SELECT token_hash FROM devices WHERE id=? AND identity_id=?)').bind(identity.id,body.deviceId,identity.id).run();
+          return json({removed:true});
         }
         if (path === '/api/logout' && request.method === 'POST') {
           const raw = (request.headers.get('Cookie') || '').split(';').map(s=>s.trim()).find(s=>s.startsWith(cookieName(env)+'='))?.split('=')[1];
