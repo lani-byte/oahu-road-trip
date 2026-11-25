@@ -508,3 +508,23 @@ body { background-color: #10192b; background-image: radial-gradient(ellipse at 0
  .briefing-tip p { font-size: 9pt; line-height: 1.4; }
  .briefing-tip .sign-art, .briefing-tip .sign-img { width: 44px; height: 44px; }
 }
+
+/* Coastal racing presentation: decorative art only, no changes to sign diagrams. */
+.hero-art { object-position: 65% center; }
+.home-hero::after { background: linear-gradient(90deg,rgba(5,17,27,.73),rgba(5,17,27,.28) 48%,transparent 75%); }
+.map .island { fill: url(#island-terrain); stroke: #c5dc9b; stroke-width: 3; filter: drop-shadow(0 5px 2px #124a48) drop-shadow(0 12px 12px #08253c); }
+.map .ridge { stroke: #265a3f; stroke-width: 12; opacity: .55; filter: drop-shadow(2px 2px 1px #85b16c); }
+.map .route { stroke: #263748; stroke-width: 14; filter: drop-shadow(0 2px 1px #153b3b); }
+.map .route-dash { stroke: #ffe08b; stroke-width: 2; stroke-dasharray: 8 8; }
+.map .stop-dot { stroke: #e3f4ef; stroke-width: 2; filter: drop-shadow(0 3px 2px #092b3a); }
+.track { background: linear-gradient(#47685c 0 9%,#becbb6 9% 12%,#263443 12% 87%,#c8d1c4 87% 90%,#325a4c 90%); box-shadow: inset 0 3px 9px #061725,0 5px 15px #07152266; border-color: #667b83; }
+.car-badge, .track .car { filter: drop-shadow(0 3px 2px #020a13aa); }
+.result-hero { background: radial-gradient(ellipse at 50% 10%,#1c5763aa,transparent 72%); border-radius: 18px; }
+@media(max-width:600px) {
+ .home-hero { display:flex; flex-direction:column; background:#102333; }
+ .hero-art { height:290px; object-position:78% center; order:2; }
+ .hero-text { position:relative; padding:24px; order:1; }
+ .home-hero::after { display:none; }
+ .title-pop { margin-top:14px; }
+ .hero-sub { max-width:none; }
+}

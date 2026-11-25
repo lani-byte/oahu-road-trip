@@ -148,7 +148,7 @@
   }
 
   function carSVG(color, cls) {
-    return `<svg class="${cls || ""}" viewBox="0 0 64 40" aria-hidden="true"><path d="M6 26 L12 14 Q14 10 19 10 H42 Q47 10 50 14 L56 22 Q60 23 60 28 V31 H4 V28 Q4 26 6 26 Z" fill="${color}" stroke="#0d1119" stroke-width="2.5"/><path d="M17 14 H30 V22 H12 Z M33 14 H44 L50 22 H33 Z" fill="#bfe9f2" stroke="#0d1119" stroke-width="2"/><circle cx="16" cy="31" r="6" fill="#0d1119"/><circle cx="16" cy="31" r="2.5" fill="#a8b1c7"/><circle cx="48" cy="31" r="6" fill="#0d1119"/><circle cx="48" cy="31" r="2.5" fill="#a8b1c7"/><rect x="55" y="24" width="4" height="3" rx="1" fill="#fff6c2"/></svg>`;
+    return `<svg class="${cls || ""}" viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="32" cy="34" rx="29" ry="4" fill="#030b13" opacity=".5"/><path d="M4 25L9 21L20 11Q23 9 29 9H38Q42 9 46 14L52 21L59 23L62 28L60 33H4L2 29Z" fill="${color}" stroke="#102334" stroke-width="1.4"/><path d="M12 21L22 12H29V21ZM32 12H38Q40 12 43 16L47 21H32Z" fill="#183a50"/><path d="M14 19L23 13H28L20 20ZM34 13H38L43 19H34Z" fill="#8ed6e5" opacity=".7"/><path d="M5 25Q30 21 58 25" fill="none" stroke="#fff" stroke-opacity=".65" stroke-width="1.2"/><path d="M5 29H60L58 33H5Z" fill="#071b2a" opacity=".4"/><path d="M31 23V29M34 24H38" stroke="#173041" stroke-opacity=".55" fill="none"/><path d="M54 24H60L61 27H55Z" fill="#ebfbff"/><path d="M3 25H7V28H3Z" fill="#ff5858"/><path d="M8 12H19" stroke="${color}" stroke-width="2"/><circle cx="15" cy="31" r="6.5" fill="#07111c"/><circle cx="49" cy="31" r="6.5" fill="#07111c"/><circle cx="15" cy="31" r="4" fill="#b1c3cf"/><circle cx="49" cy="31" r="4" fill="#b1c3cf"/><path d="M15 27V35M11 31H19M49 27V35M45 31H53" stroke="#42586a" stroke-width="1.5"/><circle cx="15" cy="31" r="1.3" fill="#e9f6ff"/><circle cx="49" cy="31" r="1.3" fill="#e9f6ff"/></svg>`;
   }
 
   const SIGNS = window.ORT_SIGNS || {};
@@ -251,7 +251,7 @@
   // Home (garage): animated island scene, drivers, what's inside, sign teaser
   // ------------------------------------------------------------------
   function heroScene() {
-    return `<img class="hero-art" src="assets/oahu-arcade-hero-v2.svg" width="1200" height="600" alt="Arcade game illustration of a coral car, island mountains and a turquoise coastline" fetchpriority="high" decoding="async">`;
+    return `<img class="hero-art" src="assets/oahu-racing-hero-v3.png" width="1774" height="887" alt="Racing-game scene of a coral sports coupe on an imagined island coastal road" fetchpriority="high" decoding="async">`;
   }
 
   function teaser() {
@@ -416,7 +416,7 @@
     const island = "100,228 160,222 225,221 275,214 319,201 369,141 400,94 440,62 462,47 505,82 550,127 569,181 605,220 637,255 656,302 672,345 687,396 720,415 750,423 776,392 800,383 812,398 806,409 790,420 794,463 812,500 837,550 870,566 887,584 868,620 837,644 812,631 760,640 715,650 687,658 662,638 640,610 612,591 580,584 550,577 494,577 500,540 500,503 475,490 450,512 450,530 469,571 450,584 380,592 312,597 294,557 250,483 206,403 175,362 150,310 137,262";
     return `
     <svg class="map" viewBox="0 0 1000 700" role="img" aria-label="Map of Oʻahu with ${STOPS.length} stops">
-      <path class="wave" d="M40 80 q20 -12 40 0 t40 0"/><path class="wave" d="M860 160 q20 -12 40 0 t40 0"/><path class="wave" d="M120 640 q20 -12 40 0 t40 0"/><path class="wave" d="M900 300 q20 -12 40 0 t40 0"/>
+      <defs><linearGradient id="island-terrain" x2=".8" y2="1"><stop stop-color="#b6cc70"/><stop offset=".45" stop-color="#4d9457"/><stop offset="1" stop-color="#1b684d"/></linearGradient><radialGradient id="map-water"><stop stop-color="#188c9d"/><stop offset="1" stop-color="#0b304c"/></radialGradient></defs><rect width="1000" height="700" fill="url(#map-water)"/><path class="wave" d="M40 80 q20 -12 40 0 t40 0"/><path class="wave" d="M860 160 q20 -12 40 0 t40 0"/><path class="wave" d="M120 640 q20 -12 40 0 t40 0"/><path class="wave" d="M900 300 q20 -12 40 0 t40 0"/>
       <polygon class="island" points="${island}"/>
       <polyline class="ridge" points="150,285 205,330 255,405 300,490"/>
       <polyline class="ridge" points="470,100 535,175 590,255 640,345 672,420 715,505 790,585"/>
