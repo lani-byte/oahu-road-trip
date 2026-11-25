@@ -1,7 +1,7 @@
 import {now, opaque, hash, recoveryCode, normalizeCode, cookieName, sessionCookie, getIdentity, createSession, ensureIdentity, entitlement, rateLimit, sameOrigin, json, smallJSON} from './access.mjs';
 import {checkoutOptions, checkoutReady, handlePaymentEvent} from './payments.mjs';
 const FREE_TOPIC = 'basics';
-const ALLOWED_ASSET = /^(?:\/|\/index\.html|\/css\/style\.css|\/js\/(?:game|signs)\.js|\/signs\/[A-Za-z0-9_-]+\.svg|\/favicon\.ico|\/robots\.txt)$/;
+const ALLOWED_ASSET = /^(?:\/|\/index\.html|\/css\/style\.css|\/js\/(?:game|signs)\.js|\/signs\/[A-Za-z0-9_-]+\.svg|\/assets\/oahu-coast-hero-v1\.jpg|\/favicon\.ico|\/robots\.txt)$/;
 export function createApp({questions, makeStripe, verifyEvent}) {
   const topicQuestionIds = {};
   for (const question of questions) (topicQuestionIds[question.t] ||= []).push(question.id);

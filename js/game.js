@@ -251,31 +251,7 @@
   // Home (garage): animated island scene, drivers, what's inside, sign teaser
   // ------------------------------------------------------------------
   function heroScene() {
-    return `<svg class="hero-scene" viewBox="0 0 800 320" preserveAspectRatio="xMidYMax slice" role="img" aria-label="A car driving along the coast of Oʻahu at sunset, with Lēʻahi (Diamond Head) behind it">
-      <defs>
-        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2a7a"/><stop offset=".45" stop-color="#ff5f7e"/><stop offset=".8" stop-color="#ffb347"/><stop offset="1" stop-color="#ffd98a"/></linearGradient>
-        <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22c3d6"/><stop offset="1" stop-color="#0b5e7d"/></linearGradient>
-        <linearGradient id="sunfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#ffb347"/></linearGradient>
-        <clipPath id="above"><rect x="0" y="0" width="800" height="196"/></clipPath>
-      </defs>
-      <rect width="800" height="320" fill="url(#sky)"/>
-      <g class="clouds"><g class="cloud c1"><ellipse cx="110" cy="70" rx="48" ry="16" fill="#fff" opacity=".85"/><ellipse cx="140" cy="60" rx="30" ry="16" fill="#fff" opacity=".85"/></g>
-        <g class="cloud c2"><ellipse cx="420" cy="48" rx="56" ry="15" fill="#fff" opacity=".7"/><ellipse cx="450" cy="38" rx="28" ry="13" fill="#fff" opacity=".7"/></g></g>
-      <circle class="sun" cx="560" cy="182" r="62" fill="url(#sunfill)" clip-path="url(#above)"/>
-      <path d="M360 198 L430 168 Q470 150 500 132 Q520 122 540 136 L575 128 Q600 120 640 140 Q690 150 735 180 L790 198 Z" fill="#4a2463"/>
-      <path d="M500 132 Q520 122 540 136 L548 146 Q520 136 505 142 Z" fill="#5d3178"/>
-      <rect y="194" width="800" height="62" fill="url(#sea)"/>
-      <g class="waves"><path d="M0 212 q20 -6 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" fill="none" stroke="#bff3f8" stroke-width="2.5" opacity=".7"/>
-        <path d="M-20 232 q20 -6 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" fill="none" stroke="#bff3f8" stroke-width="2" opacity=".45"/></g>
-      <rect y="250" width="800" height="12" fill="#f3d9a4"/>
-      <rect y="262" width="800" height="58" fill="#2a2f3d"/>
-      <line class="dash" x1="0" y1="291" x2="820" y2="291" stroke="#ffcc00" stroke-width="5" stroke-dasharray="26 18"/>
-      <g class="palm" transform="translate(608,48) scale(.82)"><path d="M18 262 Q8 200 30 150" fill="none" stroke="#6b4123" stroke-width="10" stroke-linecap="round"/>
-        <path d="M30 150 Q0 132 -28 150 Q2 140 30 152 Z M30 150 Q54 124 86 136 Q56 138 30 152 Z M30 150 Q20 118 -6 108 Q28 120 32 150 Z M30 150 Q48 110 76 104 Q46 122 32 150 Z M30 150 Q60 152 78 178 Q50 160 30 152 Z" fill="#1f9d55"/></g>
-      <g class="palm p2" transform="translate(700,10) scale(.8)"><path d="M18 262 Q28 200 8 150" fill="none" stroke="#6b4123" stroke-width="10" stroke-linecap="round"/>
-        <path d="M8 150 Q-22 132 -50 150 Q-20 140 8 152 Z M8 150 Q32 124 64 136 Q34 138 8 152 Z M8 150 Q-2 118 -28 108 Q6 120 10 150 Z M8 150 Q26 110 54 104 Q24 122 10 150 Z" fill="#1f9d55"/></g>
-      <g class="hero-car"><g transform="translate(250,228) scale(1.6)">${carSVG(P() ? P().color : "#ff5a5f").replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g></g>
-    </svg>`;
+    return `<img class="hero-art" src="assets/oahu-coast-hero-v1.jpg" width="1536" height="1024" alt="Illustration of a coral car on an imagined Oʻahu coastal road at sunset, with ocean and palms" fetchpriority="high" decoding="async">`;
   }
 
   function teaser() {
