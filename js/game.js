@@ -251,7 +251,7 @@
   // Home (garage): animated island scene, drivers, what's inside, sign teaser
   // ------------------------------------------------------------------
   function heroScene() {
-    return `<img class="hero-art" src="assets/oahu-coast-hero-v1.jpg" width="1536" height="1024" alt="Illustration of a coral car on an imagined Oʻahu coastal road at sunset, with ocean and palms" fetchpriority="high" decoding="async">`;
+    return `<img class="hero-art" src="assets/oahu-arcade-hero-v1.svg" width="1200" height="600" alt="Arcade game illustration of a coral car, island mountains and a turquoise coastline" fetchpriority="high" decoding="async">`;
   }
 
   function teaser() {

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+<title id="title">Oʻahu arcade road trip</title><desc id="desc">A stylized game world with a coral car, a coastal road, turquoise water and angular island mountains. Decorative imagined scenery.</desc>
+<defs>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#171339"/><stop offset=".55" stop-color="#633e7a"/><stop offset="1" stop-color="#ff837c"/></linearGradient>
+ <linearGradient id="water" x2="0" y2="1"><stop stop-color="#29c9d1"/><stop offset="1" stop-color="#075274"/></linearGradient>
+ <linearGradient id="road" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#39496b"/><stop offset="1" stop-color="#18253e"/></linearGradient>
+ <linearGradient id="car" x2="0" y2="1"><stop stop-color="#ff9479"/><stop offset="1" stop-color="#fa4269"/></linearGradient>
+ <linearGradient id="glass" x2="1" y2="1"><stop stop-color="#9ce8e5"/><stop offset="1" stop-color="#235474"/></linearGradient>
+ <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#99e8f2" stroke-opacity=".05"/></pattern>
+ <clipPath id="sun"><circle cx="867" cy="205" r="95"/></clipPath>
+</defs>
+<path fill="url(#sky)" d="M0 0h1200v600H0z"/>
+<path fill="url(#grid)" d="M0 0h1200v600H0z"/>
+<g fill="#e6cbff" opacity=".6"><path d="M640 49h4v4h-4zM735 79h3v3h-3zM1050 42h4v4h-4zM562 110h3v3h-3zM1120 98h3v3h-3z"/></g>
+<g clip-path="url(#sun)" fill="#ffbd78"><path d="M760 100h210v105H760zM760 212h210v12H760zM760 231h210v11H760zM760 251h210v9H760zM760 270h210v8H760zM760 289h210v7H760z"/></g>
+<path d="M550 217h115l21-11h74l18 11h66" fill="none" stroke="#eeb2c5" stroke-width="4" opacity=".35"/>
+<path d="M0 290H1200V600H0z" fill="url(#water)"/>
+<path d="M520 289h680" stroke="#9df2e8" stroke-width="4"/>
+<path d="M0 338h95m180-20h70m80 48h170m42-36h88M0 441h180m106-30h135m-80 107h180m-460 42h210m265-167h100m-145 81h125" stroke="#62e2df" stroke-width="3" opacity=".25"/>
+<path d="M747 291l43-42 32 6 51-60 38 13 38-48 36 26 18-8 46 57 43-10 108 77z" fill="#263454"/>
+<path d="M873 195l38 13 38-48 36 26-43 44-33 4-29 43-88 14z" fill="#49618a"/>
+<path d="M949 160l36 26 18-8 46 57-40-11-24-14z" fill="#6b7c9d"/>
+<path d="M880 277l29-43 33-4-16 33 55 12-15 24H747z" fill="#304d70"/>
+<path d="M1200 280l-115-19-102 22-72 28-109 46-112 50-156 94-87 99h753z" fill="#183c4c"/>
+<path d="M1200 278l-115-15-102 24-68 29-108 47-110 51-154 95-80 91h737z" fill="#2a896e"/>
+<path d="M1200 281l-113-13-102 25-66 31-107 48-108 52-144 94-74 82h60l72-82 142-86 106-49 110-48 65-30 63-15 96 5z" fill="#66b78b"/>
+<path d="M540 600c91-101 191-151 282-197 112-57 216-74 230-99 10-18-36-24-49-24h82c112 21 79 61 27 94-71 45-96 124 9 226z" fill="#0b273d"/>
+<path d="M563 600c88-98 180-143 271-190 115-58 220-76 231-106 5-13-7-19-19-24h33c101 23 61 61 18 89-81 53-99 136 3 231z" fill="#d7d9cc"/>
+<path d="M582 600c80-88 176-141 259-182 118-59 220-80 236-111 6-11 1-20-8-27h10c92 23 49 56 12 80-92 60-112 152-16 240z" fill="url(#road)"/>
+<path d="M805 600c-9-53 27-94 97-134 76-43 159-81 183-116" fill="none" stroke="#ffd958" stroke-width="5"/>
+<path d="M827 600c-14-51 17-91 82-129 75-43 156-82 179-120" fill="none" stroke="#ffd958" stroke-width="5"/>
+<path d="M662 574l32-26m47-31 29-19m53-30 27-15m47-24 22-11m45-21 17-8m34-18 13-8" fill="none" stroke="#e4f1eb" stroke-width="4" opacity=".6"/>
+<!-- Angular tropical scenery. -->
+<g stroke="#102f43" stroke-linejoin="round">
+ <path d="M1168 360l-14-129-26-101 15-3 33 97 24 136z" fill="#cd9163" stroke-width="5"/>
+ <path d="M1137 135l-77-29-75 14 66-36 58 6-58-51-65-6 84-12 55 48-12-67 29 10 17 76 59-50 51 5-67 25-30 40 74-11 52 39-77-15-44 16 49 39 14 48-47-50-51-21z" fill="#27a780" stroke-width="5"/>
+ <path d="M1137 135l-76-29m76 29-68-66m68 66-12-66m12 66 51-40m-51 40 64 3" fill="none" stroke="#75d2a1" stroke-width="3"/>
+</g>
+<g fill="#3cac89" stroke="#133e4a" stroke-width="4"><path d="M646 477l-35-31 30 4-11-36 29 28 10-31 9 40 34-12-26 31 2 26z"/><path d="M1117 519l-2-36 19 23 17-45 3 44 36-21-20 40 32 1-31 22z"/></g>
+<!-- Arcade car, hard shaded body and game-like silhouette. -->
+<g class="arcade-car">
+ <ellipse cx="992" cy="516" rx="95" ry="26" fill="#061628" opacity=".6"/>
+ <path d="M918 463l4 50 22 11 15-7-3-54zM1045 427l8 47 18 2 13-15-8-42z" fill="#0b1528" stroke="#081429" stroke-width="5"/>
+ <path d="M901 461l29-56 41-36 67-8 41 23 15 77-26 48-117 22-42-27z" fill="url(#car)" stroke="#101b35" stroke-width="6" stroke-linejoin="round"/>
+ <path d="M930 405l41-36 67-8 41 23-28 35-80 13z" fill="#ffad8b" stroke="#101b35" stroke-width="5" stroke-linejoin="round"/>
+ <path d="M946 405l32-28 57-7 28 16-23 23-66 12z" fill="url(#glass)" stroke="#182641" stroke-width="5"/>
+ <path d="M1051 419l28-35 15 77-26 48-10-47z" fill="#ce3159"/>
+ <path d="M912 455l52 17 89-17-2 36-96 21-43-26z" fill="#f74c70" stroke="#17203c" stroke-width="4"/>
+ <path d="M917 465l28 9 1 13-28-7zM1016 470l27-6-1 14-25 6z" fill="#ffddd2" stroke="#812a4b" stroke-width="3"/>
+ <path d="M923 495l32 11 91-19-3 11-89 20-31-11z" fill="#202c46"/>
+ <path d="M964 481l32-6 1 12-33 7z" fill="#f7dbad"/>
+ <path d="M906 446l17-4 6 8-18 5zM1080 407l16 2 4 9-17 2z" fill="#ff7b83" stroke="#19213c" stroke-width="4"/>
+ <path d="M938 439l28 11 65-14" fill="none" stroke="#ffb49e" stroke-width="3"/>
+</g>
+<path d="M0 599h1200" stroke="#51e3d4" stroke-width="4"/>
+</svg>
